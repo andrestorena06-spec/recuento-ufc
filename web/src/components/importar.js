@@ -28,7 +28,6 @@ export function fusionar(leidas, s, modo = 'agregar') {
     const f = { ...filas[i], conteos: [...filas[i].conteos], od: { ...filas[i].od, lecturas: [...filas[i].od.lecturas] } }
     if (x.tiempo !== undefined) f.tiempo = x.tiempo
     if (x.vol !== undefined) f.vol = x.vol
-    if (x.dprev !== undefined) f.dprev = x.dprev
     x.conteos?.forEach((v, k) => { if (v !== undefined) f.conteos[k] = v })
     if (x.od) {
       x.od.lecturas?.forEach((v, k) => { f.od.lecturas[k] = v })

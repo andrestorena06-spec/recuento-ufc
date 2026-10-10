@@ -16,7 +16,7 @@ export const optsDef = () => ({
 export const UNIDADES_T = [['min', 'minutos'], ['h', 'horas'], ['d', 'días']]
 
 export const filaVacia = (muestra = '', rep = '', K = K_DEF, M = 1) => ({
-  id: nuevoId(), muestra, tiempo: '', rep, repManual: false, vol: '', dprev: '', conteos: Array(K).fill(''),
+  id: nuevoId(), muestra, tiempo: '', rep, repManual: false, vol: '', conteos: Array(K).fill(''),
   od: { lecturas: Array(M).fill(''), blanco: '', dil: '' },
 })
 

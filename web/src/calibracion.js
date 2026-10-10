@@ -25,7 +25,7 @@ export function correspondencia(filasTodas, o) {
   const ind = filas.map((f) => {
     const r = calcularFila(f, o)
     const d = odDeFila(f, o)
-    // UFC/mL en la suspensión cuya OD se leyó = UFC/mL madre / factor de dilución de la lectura
+    // UFC/mL en la suspensión cuya OD se leyó = UFC/mL de la muestra / factor de dilución de la lectura
     const y = r.Nmadre / d.Fod
     return {
       id: f.id, muestra: f.muestra, tiempo: tNorm(f.tiempo), t: tNum(f.tiempo), rep: f.rep,
