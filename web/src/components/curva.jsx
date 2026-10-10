@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Campo, Check, Select } from './ui.jsx'
 import { PanelGrafico } from './panelGrafico.jsx'
-import { ModoSel } from './tabla.jsx'
+import { ModoSel, PuntosSel } from './tabla.jsx'
 import { ondaDe } from './od.jsx'
-import { ajustar, datosCurva, etiquetaK, interpretar, linealidadOD, MODELOS, odParaUFC } from '../calibracion.js'
+import { etiquetaK, interpretar, MODELOS, odParaUFC } from '../calibracion.js'
+import { ejeUFC, OPCIONES_EJE_UFC } from '../modelo.js'
 import { cient, fmtP, leerFactor } from '../ufc.js'
 import { finito } from '../estadistica.js'
 import { paletaMuestras } from '../utils.js'
-import { excelDe } from '../excel.js'
+import { excelDe, hojaCondiciones } from '../excel.js'
 import { descargarBlob } from '../utils.js'
 
 const num = (x, d = 4) => (finito(x) ? (Math.abs(x) >= 1e4 || (Math.abs(x) < 1e-3 && x !== 0) ? cient(x, 3) : x.toPrecision(d)) : '–')
@@ -16,21 +17,20 @@ export function CurvaTab({ s }) {
   const o = s.opts
   const onda = ondaDe(o)
   const ejeOD = `OD${onda ? ' a ' + onda + ' nm' : ''}`
-  const { todos, usados } = useMemo(() => datosCurva(s.corr, o), [s.corr, o])
-  const ajustes = useMemo(() => Object.fromEntries(Object.keys(MODELOS).map((m) => [m, ajustar(usados, m, o.ponderacion)])), [usados, o.ponderacion])
+  const ejeOD2 = o.puntos === 'dilucion' ? ejeOD : `OD corregida${onda ? ' (' + onda + ' nm)' : ''}`
+  const { todos, usados, ajustes, lin } = s.curva
   const aj = ajustes[o.modelo]
   const ok = aj && !aj.error
   const u = o.unidadTiempo || 'h'
   const tiempos = [...new Set(s.corr.ind.map((p) => p.tiempo))].sort((a, b) => (Number(a) - Number(b)) || String(a).localeCompare(String(b)))
   const porTiempo = o.colorPor === 'tiempo'
   const porDil = o.colorPor === 'dilucion'
-  const dils = [...new Set(s.corr.ind.map((p) => p.k).filter((k) => k !== null))].sort((a, b) => a - b)
+  const dils = [...new Set(s.corr.ind.map((p) => p.k).filter((k) => k !== null))].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }))
   const colD = paletaMuestras(dils.map(String))
   const colM = paletaMuestras(s.corr.muestras)
   const colT = paletaMuestras(tiempos)
   const colorDe = (p) => (porTiempo ? colT[p.tiempo] : porDil ? colD[String(p.k)] : colM[p.muestra])
   const nombreDe = (p) => (p.tipo === 'promedio' ? `${p.etiqueta}, ${etiquetaK(p.k).toLowerCase()} (promedio)` : `${p.etiqueta}, réplica ${p.rep}, ${etiquetaK(p.k).toLowerCase()}`)
-  const lin = useMemo(() => linealidadOD(s.filas, o), [s.filas, o])
   const [barras, setBarras] = useState(true)
 
   const alternar = (p) => {
@@ -60,7 +60,7 @@ export function CurvaTab({ s }) {
     if (barras && !prom && finito(p.ic?.[0])) yErr = p.ic
     return {
       key: p.key, x: p.x, y: p.y, color: colorDe(p), excluido: !p.usado, forma: prom ? 'cuadrado' : 'circulo', yErr, xErr,
-      titulo: `${nombreDe(p)}\nOD = ${p.x.toFixed(3)} · ${cient(p.y)} UFC/mL${p.usado ? '' : '\nFuera del ajuste: ' + p.motivo}\nClic para ${p.usado ? 'excluir' : 'incluir'}`,
+      titulo: `${nombreDe(p)}${p.dilsOD ? ` (OD de ${p.dilsOD.map(etiquetaK).join(', ').toLowerCase()})` : ''}\nOD = ${p.x.toFixed(3)} · ${cient(p.y)} UFC/mL${p.usado ? '' : '\nFuera del ajuste: ' + p.motivo}\nClic para ${p.usado ? 'excluir' : 'incluir'}`,
     }
   })
   const leyenda = [
@@ -95,6 +95,7 @@ export function CurvaTab({ s }) {
       nombre: 'Parámetros', columnas: ['Parámetro', 'Estimación', 'Error estándar', 'IC95 inf', 'IC95 sup', 't', 'p'],
       filas: aj.M.params.map((nm, i) => ({ Parámetro: nm, Estimación: aj.f.beta[i], 'Error estándar': aj.f.se[i], 'IC95 inf': aj.f.ic[i][0], 'IC95 sup': aj.f.ic[i][1], t: aj.f.t[i], p: aj.f.p[i] })),
     })
+    hojas.push(hojaCondiciones(o))
     excelDe(hojas).then((b) => descargarBlob(b, `curva_${o.modelo}.xlsx`))
   }
 
@@ -102,7 +103,8 @@ export function CurvaTab({ s }) {
     <div className="con-lateral">
       <aside className="lateral">
         <h2>Curva de calibración</h2>
-        <Campo label="Puntos"><ModoSel s={s} /></Campo>
+        <Campo label="OD de cada punto"><PuntosSel s={s} /></Campo>
+        <Campo label="Réplicas"><ModoSel s={s} /></Campo>
         <Campo label="Modelo">
           <Select value={o.modelo} onChange={(v) => s.setOpt('modelo', v)} opciones={Object.entries(MODELOS).map(([k, m]) => [k, m.nombre])} />
         </Campo>
@@ -116,16 +118,23 @@ export function CurvaTab({ s }) {
           ? (o.ponderacion === 'relativa' ? 'Recomendado: el error de un recuento es proporcional a su valor, así que cada punto pesa según su error relativo.' : 'Sin ponderar, los puntos de UFC alta dominan el ajuste.')
           : 'Ajuste por mínimos cuadrados sobre log₁₀(UFC/mL): ya supone error proporcional.'}</p>
         <div className="fila-ctrl">
-          <Campo label="Eje Y"><Select value={o.escalaY} onChange={(v) => s.setOpt('escalaY', v)} opciones={[['log', 'Log'], ['lin', 'Lineal']]} /></Campo>
+          <Campo label="Eje Y (UFC)"><Select value={o.escalaY} onChange={(v) => s.setOpt('escalaY', v)} opciones={OPCIONES_EJE_UFC} /></Campo>
           <Campo label="Eje X"><Select value={o.escalaX} onChange={(v) => s.setOpt('escalaX', v)} opciones={[['lin', 'Lineal'], ['log', 'Log']]} /></Campo>
         </div>
         <Campo label="Color de los puntos">
           <Select value={o.colorPor} onChange={(v) => s.setOpt('colorPor', v)} opciones={[['muestra', 'Por muestra'], ['tiempo', 'Por tiempo'], ['dilucion', 'Por dilución']]} />
         </Campo>
+        <Check label="Ecuación y R² sobre el gráfico" checked={o.mostrarEcuacion} onChange={(v) => s.setOpt('mostrarEcuacion', v)} />
         <Check label="Banda de confianza 95 % (de la curva)" checked={o.bandaC} onChange={(v) => s.setOpt('bandaC', v)} />
         <Check label="Banda de predicción 95 % (de una medición nueva)" checked={o.bandaP} onChange={(v) => s.setOpt('bandaP', v)} />
         <Check label="Barras de error en los puntos" checked={barras} onChange={setBarras}
           ayuda={o.modo === 'promedio' ? '± 1 DE (OD y log₁₀ UFC)' : 'IC 95 % de Poisson del recuento'} />
+        <h3>Rango de tiempo del ajuste</h3>
+        <div className="fila-ctrl">
+          <Campo label={`Desde (${u})`}><input value={o.tMin} placeholder="sin límite" onChange={(e) => s.setOpt('tMin', e.target.value)} /></Campo>
+          <Campo label={`Hasta (${u})`}><input value={o.tMax} placeholder="sin límite" onChange={(e) => s.setOpt('tMax', e.target.value)} /></Campo>
+        </div>
+        <p className="nota">Lo usual es construir la ecuación solo con la fase exponencial. En la pestaña <button className="enlace" onClick={() => s.irA('crecimiento')}>Crecimiento</button> se detecta y se puede aplicar acá con un clic.</p>
         <h3>Rango de OD del ajuste</h3>
         <div className="fila-ctrl">
           <Campo label="OD mínima"><input value={o.odMin} placeholder="sin límite" onChange={(e) => s.setOpt('odMin', e.target.value)} /></Campo>
@@ -143,9 +152,10 @@ export function CurvaTab({ s }) {
         ) : (
           <>
             <PanelGrafico estilo={s.estilos.curva} setEstilo={s.setEstilo('curva')} nombre={`curva_${o.modelo}`} alto={460}
-              puntos={puntos} curvas={curvas} bandas={bandas} leyenda={leyenda} onClickPunto={alternar}
-              ejeX={{ titulo: ejeOD, log: o.escalaX === 'log', cero: o.escalaX !== 'log' }}
-              ejeY={{ titulo: 'UFC/mL', log: o.escalaY === 'log', cero: o.escalaY !== 'log' }} />
+              puntos={puntos} curvas={curvas} bandas={bandas} leyenda={leyenda} onClickPunto={alternar} nota={s.nota}
+              anotacion={ok && o.mostrarEcuacion ? [aj.M.ecuacionCorta ? aj.M.ecuacionCorta(aj.f.beta) : aj.M.ecuacion(aj.f.beta), `R² = ${aj.f.r2.toFixed(4)} · n = ${aj.f.n}`] : []}
+              ejeX={{ titulo: ejeOD2, log: o.escalaX === 'log', cero: o.escalaX !== 'log' }}
+              ejeY={ejeUFC(o)} />
             {aj?.error && <p className="banner">{aj.error}</p>}
             {ok && <Resultados aj={aj} s={s} />}
             {comparacion.length > 0 && (
@@ -170,9 +180,9 @@ export function CurvaTab({ s }) {
                   Menor AICc = mejor equilibrio entre ajuste y número de parámetros; ΔAICc &lt; 2 se considera equivalente. No elijas solo por el número: mirá también los residuos.</p>
               </section>
             )}
-            {ok && <Interpretacion ajustes={ajustes} aj={aj} usados={usados} lin={lin} />}
-            {ok && <Residuos s={s} aj={aj} colorDe={colorDe} nombreDe={nombreDe} ejeOD={ejeOD} />}
-            {ok && <Calculadora aj={aj} xmin={xmin} xmax={xmax} onda={onda} />}
+            {ok && <Interpretacion ajustes={ajustes} aj={aj} usados={usados} lin={lin} o={o} />}
+            {ok && <Residuos s={s} aj={aj} colorDe={colorDe} nombreDe={nombreDe} ejeOD={ejeOD2} />}
+            {ok && <Calculadora aj={aj} xmin={xmin} xmax={xmax} onda={onda} corregida={o.puntos !== 'dilucion'} />}
           </>
         )}
       </div>
@@ -210,8 +220,8 @@ function Resultados({ aj, s }) {
   )
 }
 
-function Interpretacion({ ajustes, aj, usados, lin }) {
-  const items = interpretar(ajustes, aj, usados, lin)
+function Interpretacion({ ajustes, aj, usados, lin, o }) {
+  const items = interpretar(ajustes, aj, usados, lin, o)
   return (
     <section style={{ marginTop: 22 }}>
       <h3>Interpretación</h3>
@@ -235,12 +245,16 @@ function Residuos({ s, aj, colorDe, nombreDe, ejeOD }) {
   )
 }
 
-function Calculadora({ aj, xmin, xmax, onda }) {
+function Calculadora({ aj, xmin, xmax, onda, corregida }) {
   const [od, setOd] = useState('0.5')
   const [fac, setFac] = useState('1')
   const [ufc, setUfc] = useState('1e8')
-  const x = Number(String(od).replace(',', '.'))
-  const F = leerFactor(fac)
+  const xLeida = Number(String(od).replace(',', '.'))
+  const Fl = leerFactor(fac)
+  // con OD corregida la curva espera la OD llevada a la muestra sin diluir (lectura × F);
+  // con puntos por dilución la curva da la UFC/mL de la dilución leída, que se multiplica por F
+  const x = corregida ? xLeida * Fl : xLeida
+  const F = corregida ? 1 : Fl
   const b = finito(x) ? aj.banda(x) : null
   const fuera = finito(x) && (x < xmin || x > xmax)
   const objetivo = Number(String(ufc).replace(',', '.'))
@@ -253,14 +267,14 @@ function Calculadora({ aj, xmin, xmax, onda }) {
           <h4>OD → UFC/mL</h4>
           <div className="fila-ctrl">
             <Campo label={`OD${onda} neta medida`}><input value={od} onChange={(e) => setOd(e.target.value)} /></Campo>
-            <Campo label="Dilución de la lectura (1:F)"><input value={fac} onChange={(e) => setFac(e.target.value)} /></Campo>
+            <Campo label="Dilución en que se leyó (1:F)"><input value={fac} onChange={(e) => setFac(e.target.value)} /></Campo>
           </div>
           {b && finito(F) ? (
             <>
               <div className="res-calc">{cient(b.y * F)} UFC/mL</div>
               <p className="nota">IC 95 % de la media: {cient(Math.max(0, b.c[0]) * F, 1)} – {cient(b.c[1] * F, 1)}<br />
                 Predicción 95 % (una muestra nueva): {cient(Math.max(0, b.p[0]) * F, 1)} – {cient(b.p[1] * F, 1)}
-                {F !== 1 && <><br />Ya multiplicado por {F} (la dilución en que se leyó).</>}</p>
+                {Fl !== 1 && (corregida ? <><br />OD corregida usada: {xLeida} × {Fl} = {x.toFixed(3)}.</> : <><br />Ya multiplicado por {Fl} (la dilución en que se leyó).</>)}</p>
               {fuera && <p className="aviso-sel">Fuera del rango calibrado (OD {xmin.toFixed(3)} a {xmax.toFixed(3)}): es una extrapolación y puede ser muy errónea.</p>}
             </>
           ) : <p className="nota">Ingresá una OD válida{aj.M.escala === 'loglog' ? ' (mayor que 0)' : ''}.</p>}
@@ -270,7 +284,7 @@ function Calculadora({ aj, xmin, xmax, onda }) {
           <Campo label="UFC/mL deseadas (ej.: 1e8 o 100000000)"><input value={ufc} onChange={(e) => setUfc(e.target.value)} /></Campo>
           {finito(xo) ? (
             <>
-              <div className="res-calc">OD{onda} ≈ {xo.toFixed(3)}</div>
+              <div className="res-calc">OD{onda}{corregida ? ' corregida' : ''} ≈ {xo.toFixed(3)}</div>
               <p className="nota">OD a la que hay que llevar la suspensión para tener esa concentración, según la curva.</p>
               {(xo < xmin || xo > xmax) && <p className="aviso-sel">Fuera del rango calibrado: conviene preparar una suspensión más concentrada (o más diluida) dentro del rango y diluirla.</p>}
             </>

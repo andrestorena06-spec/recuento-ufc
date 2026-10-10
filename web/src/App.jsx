@@ -6,15 +6,17 @@ import { CurvaTab } from './components/curva.jsx'
 import { MetodoTab } from './components/metodo.jsx'
 import { ArchivoTab } from './components/archivo.jsx'
 import { Modal } from './components/ui.jsx'
-import { K_DEF, M_DEF, optsDef, filaVacia, numerarReplicas } from './modelo.js'
+import { K_DEF, M_DEF, optsDef, filaVacia, numerarReplicas, textoCondiciones } from './modelo.js'
 import { leerFactor } from './ufc.js'
-import { correspondencia } from './calibracion.js'
+import { analisisCurva, correspondencia } from './calibracion.js'
+import { CrecimientoTab } from './components/crecimiento.jsx'
 
 const CLAVE = 'recuento-ufc-v1'
 const PESTANAS = [
   ['archivo', 'Archivo', 'Sesión y plantilla'],
   ['datos', 'Datos', 'Recuento de colonias'],
   ['od', 'OD', 'Densidad óptica'],
+  ['crecimiento', 'Crecimiento', 'Curva en el tiempo'],
   ['tabla', 'Tabla', 'UFC/mL ↔ OD'],
   ['curva', 'Curva', 'Calibración y modelos'],
   ['metodo', 'Método', 'Cálculos y referencias'],
@@ -50,7 +52,7 @@ export default function App() {
 
   useEffect(() => {
     if (pendiente) return
-    try { localStorage.setItem(CLAVE, JSON.stringify({ version: 2, fecha: new Date().toISOString(), filas, K, M, opts, estilos })) } catch { /* sin almacenamiento */ }
+    try { localStorage.setItem(CLAVE, JSON.stringify({ version: 3, fecha: new Date().toISOString(), filas, K, M, opts, estilos })) } catch { /* sin almacenamiento */ }
   }, [pendiente, filas, K, M, opts, estilos])
 
   const avisar = useCallback((texto, tipo = 'ok') => {
@@ -80,7 +82,10 @@ export default function App() {
     })))
     setK(k)
     setM(m)
-    setOpts((o) => ({ ...optsDef(), ...(x.opts || {}), nombres: [...new Set([...(o.nombres || []), ...(x.opts?.nombres || [])])] }))
+    // hasta la versión 2 los valores por defecto eran modelo lineal y eje log: se pasan a los recomendados actuales
+    const optsX = { ...(x.opts || {}) }
+    if ((Number(x.version) || 1) < 3) { optsX.modelo = 'semilog'; optsX.escalaY = 'log10'; optsX.puntos = 'corregida' }
+    setOpts((o) => ({ ...optsDef(), ...optsX, condiciones: { ...optsDef().condiciones, ...(x.opts?.condiciones || {}) }, nombres: [...new Set([...(o.nombres || []), ...(x.opts?.nombres || [])])] }))
     setEstilos(x.estilos || {})
   }
   const continuarAnterior = () => { try { aplicarSesion(g) } catch { /* nada */ } setPendiente(false) }
@@ -91,18 +96,19 @@ export default function App() {
   }, [])
 
   const corr = useMemo(() => correspondencia(filas, opts), [filas, opts])
+  const curva = useMemo(() => analisisCurva(corr, filas, opts), [corr, filas, opts])
 
   const s = {
     filas, setFilas, actualizarFila, K, setK, M, setM, opts, setOpts,
     setOpt: (k, v) => setOpts((o) => ({ ...o, [k]: v })),
     estilos, setEstilo: (k) => (e) => setEstilos((x) => ({ ...x, [k]: e })),
-    avisar, corr, irA: setTab,
-    exportarSesion: () => ({ version: 2, programa: 'recuento-ufc', filas, K, M, opts, estilos }),
+    avisar, corr, curva, irA: setTab, nota: opts.notaCondiciones ? textoCondiciones(opts) : '',
+    exportarSesion: () => ({ version: 3, programa: 'recuento-ufc', filas, K, M, opts, estilos }),
     importarSesion: aplicarSesion,
     nuevo: () => { setFilas([]); setK(K_DEF); setM(M_DEF); setOpts((o) => ({ ...optsDef(), nombres: o.nombres })) },
   }
 
-  const Vista = { archivo: ArchivoTab, datos: DatosTab, od: ODTab, tabla: TablaTab, curva: CurvaTab, metodo: MetodoTab }[tab]
+  const Vista = { archivo: ArchivoTab, datos: DatosTab, od: ODTab, crecimiento: CrecimientoTab, tabla: TablaTab, curva: CurvaTab, metodo: MetodoTab }[tab]
   const nMuestras = corr.muestras.length
   const onda = opts.onda === 'otra' ? opts.ondaOtra : opts.onda
 

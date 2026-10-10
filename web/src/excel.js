@@ -182,3 +182,17 @@ export async function plantilla() {
     { nombre: 'Instrucciones', columnas: ['Formato'], filas: ayuda },
   ])
 }
+
+// Hoja con las condiciones del experimento (se agrega a las exportaciones)
+export function hojaCondiciones(o) {
+  const c = o.condiciones || {}
+  const onda = o.onda === 'otra' ? o.ondaOtra : o.onda
+  const equipo = { cubeta: 'Espectrofotómetro, cubeta 1 cm', placa: 'Lector de microplacas', otro: 'Otro' }[o.equipo] || ''
+  const filas = [
+    ['Cepa', c.cepa], ['Medio de cultivo', c.medio], ['Temperatura (°C)', c.temperatura], ['Fecha', c.fecha],
+    ['Longitud de onda (nm)', onda], ['Equipo de OD', equipo], ['Lecturas corregidas por el blanco', o.blancoCorregido ? 'Sí' : 'No'],
+    ['Ventana lineal de OD', `${o.odLinMin} – ${o.odLinMax}`], ['Volumen sembrado (µL)', o.volFijo ? o.volDef : 'por fila'],
+    ['Rango contable', o.rango === 'custom' ? `${o.min}–${o.max}` : o.rango], ['Notas', c.notas],
+  ].map(([k, v]) => ({ Dato: k, Valor: v === undefined || v === null ? '' : String(v) }))
+  return { nombre: 'Condiciones', columnas: ['Dato', 'Valor'], filas }
+}

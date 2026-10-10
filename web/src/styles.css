@@ -326,3 +326,5 @@ h3.normal { text-transform: none; letter-spacing: 0; font-size: 14px; color: var
 .lista-muestras-pop button { display: flex; justify-content: space-between; align-items: center; gap: 14px; width: 100%; text-align: left; border: none; background: none; font-weight: 450; padding: 6px 10px; border-radius: 6px; }
 .lista-muestras-pop button.on, .lista-muestras-pop button:hover:not(:disabled) { background: var(--acento-claro); color: var(--acento-osc); }
 .lista-muestras-pop small { color: var(--suave); font-size: 11px; white-space: nowrap; }
+.grilla td.od-fuera-ventana input { background: #fff6dc; color: #8a5a00; }
+.grilla td.od-fuera input { background: #fde9c8; font-weight: 650; }

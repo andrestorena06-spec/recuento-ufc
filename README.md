@@ -8,11 +8,12 @@ Todo se calcula en el navegador: no hace falta instalar nada y los datos no se e
 ## Pestañas
 | Pestaña | Qué hace |
 |---|---|
-| Archivo | Guardar/cargar sesión, plantilla de Excel. |
+| Archivo | Guardar/cargar sesión, plantilla de Excel, condiciones del experimento (cepa, medio, temperatura…) que se agregan a todos los Excel y opcionalmente al pie de los gráficos. |
 | Datos | Grilla tipo Excel: muestra, tiempo (h por defecto), réplica (se numera sola en cada muestra y tiempo), «Sin diluir», −1 … −10 (botón **+** para agregar más). Siempre hay una fila vacía lista abajo; Enter en Muestra o Tiempo vacíos copia el de arriba; los nombres de muestra se guardan. Volumen sembrado fijo (opcional por fila). Se puede cargar un Excel o pegar una tabla: con encabezados cada dato va a su fila por muestra, tiempo y réplica. |
-| OD | Longitud de onda y una OD por dilución (Sin diluir, −1, −2…, las mismas columnas que Datos), blanco (o «lecturas ya corregidas por el blanco»), control de linealidad del fotómetro (la OD debe bajar ×10 por dilución), origen de la OD y OD en el tiempo. |
-| Tabla | Correspondencia UFC/mL ↔ OD por réplica (por defecto) o promediada, y factor de conversión directo. |
-| Curva | Cinco modelos (lineal, proporcional, cuadrático, log–log, semilog), ponderación por error proporcional, bandas de confianza y predicción, comparación por AICc, residuos, interpretación automática y calculadora OD ↔ UFC/mL. |
+| OD | OD leída en cada dilución (Sin diluir, −1, −2…). **OD corregida** = lecturas dentro de la ventana lineal del equipo (por defecto 0,1–0,8) × 10ᵏ, promediadas. Control de linealidad (la OD debe bajar ×10 por dilución), blanco u «OD ya corregida», origen de la OD. |
+| Crecimiento | Curva de crecimiento con doble eje (OD corregida a la izquierda, log₁₀ UFC/mL a la derecha), fase exponencial detectada, µ, tiempo de generación y latencia, y UFC/mL estimadas con la curva para tiempos sin recuento. |
+| Tabla | Correspondencia UFC/mL ↔ OD (OD corregida o por dilución; réplicas o promedios), **resumen por tiempo** (la tabla que se reporta), UFC/mL estimadas por la curva y factor de conversión. |
+| Curva | Correlación OD ↔ log₁₀ UFC/mL con ecuación y R² sobre el gráfico. Modelo clásico `log₁₀ UFC = m·OD + b` por defecto, comparado con lineal, proporcional, cuadrático y log–log (aviso si otro ajusta mejor). Rango de tiempo y de OD del ajuste, bandas de confianza y predicción, residuos y calculadora. |
 | Método | Explicación de todos los cálculos y referencias. |
 
 ## Cálculos principales

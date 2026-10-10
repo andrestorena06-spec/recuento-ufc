@@ -4,7 +4,8 @@ import { calcularFila, leerConteo, leerFactor } from '../src/ufc.js'
 import { icPoisson, qchisq } from '../src/estadistica.js'
 import { separarReplica, columnaDilucion, interpretarTabla } from '../src/excel.js'
 import { numerarReplicas } from '../src/modelo.js'
-import { correspondencia, linealidadOD } from '../src/calibracion.js'
+import { correspondencia, linealidadOD, odCorregida } from '../src/calibracion.js'
+import { parametrosCrecimiento } from '../src/crecimiento.js'
 
 const o = { rango: '30-300', metodo: 'ponderada', volDef: 100 }
 const cerca = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol * Math.abs(b), `${a} ≠ ${b}`)
@@ -59,7 +60,7 @@ assert.equal(t.filas[2].od.lecturas[1], '0.05')
 assert.equal(t.nOD, 2)
 
 // OD por dilución: cada lectura es un punto con UFC/mL = muestra / 10ᵏ; linealidad ≈ ×10
-const oc = { ...o, blancoCorregido: true, origenOD: {} }
+const oc = { ...o, blancoCorregido: true, origenOD: {}, puntos: 'dilucion' }
 const fila = { id: 'a', muestra: 'A', tiempo: '0', rep: 1, conteos: ['', '', '', '', '', 150], od: { lecturas: ['0.8', '0.081', '0.0079'], blanco: '' } }
 const c = correspondencia([fila], oc)
 assert.deepEqual(c.ind.map((p) => p.k), [0, 1, 2])
@@ -69,4 +70,24 @@ const L = linealidadOD([fila], oc, 0.005)
 assert.ok(L.factor > 9.5 && L.factor < 10.5, 'factor ' + L.factor)
 assert.equal(t.filas[0].conteos, undefined)
 assert.equal(t.filas[0].od.blanco, undefined)
+// OD corregida: lecturas dentro de la ventana 0,1–0,8 × 10ᵏ, promediadas; un punto por réplica
+const fila2 = { id: 'b', muestra: 'B', tiempo: '1', rep: 1, conteos: ['', '', '', '', '', 150], od: { lecturas: ['1.9', '0.62', '0.061'], blanco: '' } }
+const occ = { ...oc, puntos: 'corregida', odLinMin: 0.1, odLinMax: 0.8 }
+const oco = odCorregida(fila2, occ)
+assert.deepEqual(oco.dils, [1]); cerca(oco.od, 6.2)
+const c2 = correspondencia([fila2], occ)
+assert.equal(c2.ind.length, 1); cerca(c2.ind[0].x, 6.2); cerca(c2.ind[0].y, 150e5 / 0.1)
+// ninguna lectura en la ventana: se usa la más cercana y se marca
+const fila3 = { ...fila2, od: { lecturas: ['1.5', '', ''], blanco: '' } }
+assert.equal(odCorregida(fila3, occ).fuera, true)
+
+// crecimiento exponencial simulado: µ = 0,8 /h (g = 0,866 h), latencia 1 h, estacionaria desde 6 h
+const pts = []
+for (const t of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
+  const lnN = Math.log(1e6) + 0.8 * Math.min(Math.max(t - 1, 0), 5)
+  ;[-0.02, 0, 0.02].forEach((e) => pts.push({ t, z: lnN / Math.LN10 + e }))
+}
+const g = parametrosCrecimiento(pts)
+assert.equal(g.t1, 1); assert.equal(g.t2, 6)
+cerca(g.mu, 0.8, 1e-6); cerca(g.lag, 1, 1e-6)
 console.log('Todas las pruebas pasaron.')

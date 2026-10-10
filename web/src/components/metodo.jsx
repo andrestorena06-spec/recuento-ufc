@@ -75,8 +75,12 @@ export function MetodoTab({ s }) {
         <p><b>Misma suspensión</b>: cada réplica es un par real (OD, UFC/mL) y entra como un punto en modo individual. <b>Cultivo paralelo</b>: la réplica de OD y la de UFC son cultivos distintos, así que emparejarlas réplica a réplica es arbitrario; en modo individual esas muestras entran con un solo punto (OD media, UFC media geométrica). La variación entre cultivos se suma a la dispersión de la curva.</p>
 
         <h3>9. Correspondencia y curva de calibración</h3>
-        <p>En la pestaña OD cada columna es una dilución de la misma serie que se sembró (sin diluir, 10⁻¹, 10⁻²…). Cada lectura es un punto:
-          <code>x = OD neta</code> de la dilución 10⁻ᵏ, <code>y = UFC/mL de esa dilución</code> = UFC/mL de la muestra ÷ 10ᵏ. Así una sola réplica aporta varios puntos que cubren el rango de OD.</p>
+        <p>En la pestaña OD cada columna es una dilución de la misma serie que se sembró (sin diluir, 10⁻¹, 10⁻²…). Cuando la suspensión original es muy turbia, el equipo se satura; lo técnicamente correcto es leer diluciones y usar las lecturas que caen en el rango lineal. Hay dos formas de armar los puntos:</p>
+        <ul>
+          <li><b>OD corregida (por defecto, lo clásico).</b> Para cada réplica se toman las lecturas que caen dentro de la <b>ventana lineal</b> del equipo (por defecto 0,1–0,8, editable en la pestaña OD), cada una se lleva a la suspensión original multiplicándola por su dilución (<code>OD × 10ᵏ</code>; por ejemplo, −2 leyó 0,24 → 0,24 × 100 = 2,4) y se promedian. Ese valor es la OD de la muestra y se compara con la UFC/mL de la muestra: un punto por réplica. Si ninguna lectura cae en la ventana se usa la más cercana y se avisa.</li>
+          <li><b>Por dilución.</b> Cada lectura es un punto: <code>x = OD neta</code> de la dilución 10⁻ᵏ, <code>y = UFC/mL de esa dilución</code> = UFC/mL de la muestra ÷ 10ᵏ. Una réplica aporta varios puntos que cubren todo el rango de OD; sirve para ver directamente dónde se pierde la linealidad.</li>
+        </ul>
+        <p>En el rango lineal ambas formas son equivalentes (si la OD es proporcional a las células, OD₋ₖ × 10ᵏ = OD de la muestra). La OD corregida puede ser mayor que 1 (por ejemplo 2,4): no es una lectura, es la OD que tendría la muestra si el equipo fuera lineal.</p>
         <p><b>Linealidad del fotómetro.</b> Como la dilución es exacta (1:10), la OD de diluciones sucesivas debería bajar 10 veces. Se estima la pendiente común de <code>log₁₀(OD)</code> frente a k dentro de cada serie (lecturas &gt; 0,02): el factor medio por dilución es <code>10^(−pendiente)</code> y debería ser ≈ 10. Un factor menor indica saturación de las lecturas concentradas (o lecturas diluidas cerca del límite de detección). Este control no depende de los recuentos.</p>
         <p><b>Independencia.</b> Las diluciones de una misma réplica comparten el recuento (sus UFC/mL son ese recuento ÷ 10ᵏ), así que sus errores están correlacionados: la curva es insesgada, pero los IC de los parámetros son algo optimistas. La banda de predicción y el modo promedio dan una idea más conservadora.</p>
         <p>
@@ -87,8 +91,9 @@ export function MetodoTab({ s }) {
           <li><b>Lineal</b> <code>UFC = a + b·OD</code>: permite ordenada. Una ordenada distinta de 0 suele indicar blanco mal restado, turbidez no viable o no linealidad.</li>
           <li><b>Cuadrático por el origen</b> <code>UFC = b₁·OD + b₂·OD²</code>: corrige la pérdida de linealidad a OD altas (b₂ &gt; 0). Si b₂ es significativo, hay curvatura.</li>
           <li><b>Potencia (log–log)</b> <code>log UFC = a + b·log OD</code>: con exponente b = 1 es proporcional; b &gt; 1 indica saturación de la OD.</li>
-          <li><b>Semilog</b> <code>log UFC = a + b·OD</code>: empírico; se incluye para comparar, rara vez describe bien la turbidez.</li>
         </ul>
+        <p><b>Clásico (por defecto)</b> <code>log₁₀ UFC = m·OD + b</code>: es la recta que se enseña y se usa habitualmente (OD en el eje X, log₁₀ UFC/mL en el eje Y, línea de tendencia con su R²). Funciona bien en tramos cortos de OD, pero hay que saber que es empírica: en el rango lineal la OD es <i>proporcional</i> al número de células, así que log UFC frente a OD se curva cuando el rango de OD es amplio. Por eso el programa la compara siempre con los otros modelos y avisa si alguno ajusta claramente mejor (ΔAICc &gt; 2). El criterio habitual de R² ≥ 0,95 se informa, pero un R² alto no garantiza que el modelo sea el adecuado: mirá los residuos.</p>
+        <p>Lo usual es construir la ecuación <b>solo con la fase exponencial</b>: en la latencia y en la fase estacionaria la relación OD ↔ células viables cambia (tamaño celular, células muertas, agregados). En la pestaña Curva se puede limitar el rango de tiempo, y en Crecimiento la fase exponencial detectada se aplica con un clic.</p>
         <h4>Ponderación</h4>
         <p>El error de un recuento es <b>proporcional</b> a su valor (un 10–20 % en cualquier nivel). Un ajuste lineal sin ponderar dejaría que los puntos de 10⁹ dominen sobre los de 10⁷. Por eso los modelos lineales usan por defecto pesos <code>1/UFC²</code> (mínimos cuadrados ponderados: minimiza el error relativo), y los modelos log ajustan en log₁₀, que es equivalente. Los cálculos coinciden con <code>lm()</code> de R.</p>
         <h4>Qué se informa</h4>
@@ -101,11 +106,36 @@ export function MetodoTab({ s }) {
           <li><b>Normalidad de residuos</b>: prueba de Shapiro–Wilk (algoritmo de Royston, igual a <code>shapiro.test()</code>).</li>
           <li><b>Factor de conversión directo</b> (pestaña Tabla): media geométrica de UFC/OD de los puntos.</li>
         </ul>
+        <h4>UFC/mL estimadas con la curva</h4>
+        <p>Si en algún tiempo hay OD pero no recuento (por ejemplo, lecturas más frecuentes que las siembras), su UFC/mL se estima con la ecuación elegida y su <b>intervalo de predicción 95 %</b>. Se muestran como «estimadas» (círculos huecos en Crecimiento) y se avisa si la OD cae fuera del rango usado para calibrar, porque extrapolar puede dar errores grandes.</p>
+
+        <h3>10. Gráficos</h3>
+        <ul>
+          <li><b>UFC/mL</b> abarcan varios órdenes de magnitud: se grafican como <b>log₁₀ UFC/mL</b> (eje con valores 2…9; 10⁸ se ve como 8). Se puede cambiar a escala logarítmica con 10ⁿ o a escala lineal.</li>
+          <li><b>OD</b> se grafica en escala lineal.</li>
+          <li><b>Curva de crecimiento</b> (pestaña Crecimiento): tiempo en X, OD corregida en el eje izquierdo y log₁₀ UFC/mL en el derecho, con la media ± DE de cada tiempo.</li>
+          <li><b>Barras</b> (pestaña Datos): media geométrica (log₁₀ ± DE) de cada muestra en un tiempo, con las réplicas encima, para comparar muestras o tratamientos.</li>
+          <li><b>Correlación</b> (pestaña Curva): OD en X, UFC/mL en Y, con la ecuación y el R² sobre el gráfico.</li>
+        </ul>
+
+        <h3>11. Parámetros de crecimiento</h3>
+        <p>En la fase exponencial el número de células se duplica a intervalos constantes: <code>ln N = ln N₀ + µ·t</code>. Para cada muestra, con UFC/mL y con OD corregida:</p>
+        <ol>
+          <li><b>Fase exponencial</b>: se buscan 3 tiempos consecutivos con la mayor pendiente de log₁₀ frente al tiempo y buen ajuste lineal de las medias (R² ≥ 0,97), y la ventana se extiende mientras siga recta y cada tramo agregado tenga una pendiente ≥ 85 % de la máxima.</li>
+          <li><b>µ</b> (tasa específica de crecimiento) = pendiente de log₁₀ × ln 10, ajustada con todas las réplicas del tramo, con IC 95 % (t de Student).</li>
+          <li><b>Tiempo de generación</b> g = ln 2 / µ (tiempo en que la población se duplica).</li>
+          <li><b>Latencia</b> λ: tiempo en que la recta de la fase exponencial corta el nivel inicial (método de la tangente).</li>
+        </ol>
+        <p>Si µ por UFC y por OD difieren mucho, la relación OD ↔ células viables está cambiando durante el crecimiento (por ejemplo, células más grandes o muerte celular), y conviene calibrar solo con la fase exponencial.</p>
+
+        <h3>12. Condiciones</h3>
+        <p>Una ecuación de calibración solo vale para la cepa, el medio, la temperatura, el equipo y la longitud de onda con que se hizo. Esos datos se cargan en Archivo, se agregan a todos los Excel y pueden mostrarse al pie de los gráficos.</p>
+
         <h4>Diseño recomendado del experimento</h4>
         <ol>
           <li>Partir de un cultivo en la fase de interés (normalmente exponencial) y hacer 5–8 diluciones (por ejemplo 1:2 sucesivas) que cubran el rango de OD que se va a usar, con al menos un orden de magnitud entre la menor y la mayor.</li>
-          <li>Leer la OD de cada nivel (por duplicado o triplicado) y sembrar el mismo tubo en diluciones 1:10, cada nivel por triplicado.</li>
-          <li>Cargar cada nivel como una muestra con origen «misma suspensión».</li>
+          <li>Leer la OD de cada nivel y, si está muy turbio, también de las diluciones −1, −2 y −3 (para que alguna caiga en el rango lineal), y sembrar el mismo tubo en diluciones 1:10, cada nivel por triplicado.</li>
+          <li>Para una curva de crecimiento: muestrear en el tiempo (por ejemplo cada hora), leer la OD (y sus diluciones) y sembrar las últimas tres diluciones contables en cada tiempo.</li>
           <li>Usar la curva solo dentro del rango de OD calibrado y con el mismo equipo, longitud de onda, cepa, medio y fase de crecimiento.</li>
         </ol>
 
