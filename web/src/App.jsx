@@ -6,7 +6,8 @@ import { CurvaTab } from './components/curva.jsx'
 import { MetodoTab } from './components/metodo.jsx'
 import { ArchivoTab } from './components/archivo.jsx'
 import { Modal } from './components/ui.jsx'
-import { K_DEF, optsDef, filaVacia, numerarReplicas } from './modelo.js'
+import { K_DEF, M_DEF, optsDef, filaVacia, numerarReplicas } from './modelo.js'
+import { leerFactor } from './ufc.js'
 import { correspondencia } from './calibracion.js'
 
 const CLAVE = 'recuento-ufc-v1'
@@ -42,14 +43,14 @@ export default function App() {
   // toda modificación de filas pasa por acá: las réplicas automáticas se renumeran por muestra y tiempo
   const setFilas = useCallback((x) => setFilasCrudo((fs) => numerarReplicas(typeof x === 'function' ? x(fs) : x)), [])
   const [K, setK] = useState(K_DEF)
-  const [M, setM] = useState(1)
+  const [M, setM] = useState(M_DEF)
   const [opts, setOpts] = useState(optsDef)
   const [estilos, setEstilos] = useState({})
   const [avisos, setAvisos] = useState([])
 
   useEffect(() => {
     if (pendiente) return
-    try { localStorage.setItem(CLAVE, JSON.stringify({ fecha: new Date().toISOString(), filas, K, M, opts, estilos })) } catch { /* sin almacenamiento */ }
+    try { localStorage.setItem(CLAVE, JSON.stringify({ version: 2, fecha: new Date().toISOString(), filas, K, M, opts, estilos })) } catch { /* sin almacenamiento */ }
   }, [pendiente, filas, K, M, opts, estilos])
 
   const avisar = useCallback((texto, tipo = 'ok') => {
@@ -61,11 +62,21 @@ export default function App() {
   const aplicarSesion = (x) => {
     if (!Array.isArray(x?.filas)) throw new Error('inválida')
     const k = Math.max(Number(x.K) || K_DEF, ...x.filas.map((f) => f.conteos?.length || 0))
-    const m = Math.max(Number(x.M) || 1, ...x.filas.map((f) => f.od?.lecturas?.length || 0))
-    setFilas(x.filas.map((f) => ({
+    // versión 1: las lecturas de OD eran repeticiones de una sola suspensión (con «dilución de la lectura»);
+    // desde la versión 2 hay una OD por dilución. Se convierten a la media en la columna de su dilución.
+    const filasX = (Number(x.version) || 1) >= 2 ? x.filas : x.filas.map((f) => {
+      const v = (f.od?.lecturas || []).map((l) => Number(String(l ?? '').replace(',', '.'))).filter((n, i) => Number.isFinite(n) && String(f.od.lecturas[i] ?? '').trim() !== '')
+      const F = leerFactor(f.od?.dil)
+      const kk = Number.isFinite(F) ? Math.max(0, Math.round(Math.log10(F))) : 0
+      const lecturas = []
+      if (v.length) lecturas[kk] = String(+(v.reduce((a, b) => a + b, 0) / v.length).toFixed(4))
+      return { ...f, od: { blanco: f.od?.blanco ?? '', lecturas } }
+    })
+    const m = Math.max(Number(x.version) >= 2 ? Number(x.M) || M_DEF : M_DEF, ...filasX.map((f) => f.od?.lecturas?.length || 0))
+    setFilas(filasX.map((f) => ({
       ...filaVacia(f.muestra, f.rep, k, m), repManual: true, ...f,
       conteos: Array.from({ length: k }, (_, i) => f.conteos?.[i] ?? ''),
-      od: { blanco: '', dil: '', ...(f.od || {}), lecturas: Array.from({ length: m }, (_, i) => f.od?.lecturas?.[i] ?? '') },
+      od: { blanco: '', ...(f.od || {}), lecturas: Array.from({ length: m }, (_, i) => f.od?.lecturas?.[i] ?? '') },
     })))
     setK(k)
     setM(m)
@@ -86,9 +97,9 @@ export default function App() {
     setOpt: (k, v) => setOpts((o) => ({ ...o, [k]: v })),
     estilos, setEstilo: (k) => (e) => setEstilos((x) => ({ ...x, [k]: e })),
     avisar, corr, irA: setTab,
-    exportarSesion: () => ({ version: 1, programa: 'recuento-ufc', filas, K, M, opts, estilos }),
+    exportarSesion: () => ({ version: 2, programa: 'recuento-ufc', filas, K, M, opts, estilos }),
     importarSesion: aplicarSesion,
-    nuevo: () => { setFilas([]); setK(K_DEF); setM(1); setOpts((o) => ({ ...optsDef(), nombres: o.nombres })) },
+    nuevo: () => { setFilas([]); setK(K_DEF); setM(M_DEF); setOpts((o) => ({ ...optsDef(), nombres: o.nombres })) },
   }
 
   const Vista = { archivo: ArchivoTab, datos: DatosTab, od: ODTab, tabla: TablaTab, curva: CurvaTab, metodo: MetodoTab }[tab]

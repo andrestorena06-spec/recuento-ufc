@@ -4,6 +4,7 @@ import { calcularFila, leerConteo, leerFactor } from '../src/ufc.js'
 import { icPoisson, qchisq } from '../src/estadistica.js'
 import { separarReplica, columnaDilucion, interpretarTabla } from '../src/excel.js'
 import { numerarReplicas } from '../src/modelo.js'
+import { correspondencia, linealidadOD } from '../src/calibracion.js'
 
 const o = { rango: '30-300', metodo: 'ponderada', volDef: 100 }
 const cerca = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol * Math.abs(b), `${a} ≠ ${b}`)
@@ -52,8 +53,20 @@ const nr = numerarReplicas([f('L100', 0), f('L100', 0), f('L100', '0,0'), f('L10
 assert.deepEqual(nr.map((x) => x.rep), [1, 2, 3, 2, 3, 1, 1, ''])
 
 // tabla pegada con encabezados: tiempo y réplicas por grupo, solo los campos presentes
-const t = interpretarTabla([['Muestra', 'Tiempo (h)', 'OD'], ['L100', '0', '0.1'], ['L100', '0', '0.12'], ['L100', '2', '0.5']])
+const t = interpretarTabla([['Muestra', 'Tiempo (h)', 'OD', 'OD -1'], ['L100', '0', '0.1', ''], ['L100', '0', '0.12', ''], ['L100', '2', '0.5', '0.05']])
 assert.deepEqual(t.filas.map((x) => [x.tiempo, x.rep, x.od.lecturas[0]]), [['0', 1, '0.1'], ['0', 2, '0.12'], ['2', 1, '0.5']])
+assert.equal(t.filas[2].od.lecturas[1], '0.05')
+assert.equal(t.nOD, 2)
+
+// OD por dilución: cada lectura es un punto con UFC/mL = muestra / 10ᵏ; linealidad ≈ ×10
+const oc = { ...o, blancoCorregido: true, origenOD: {} }
+const fila = { id: 'a', muestra: 'A', tiempo: '0', rep: 1, conteos: ['', '', '', '', '', 150], od: { lecturas: ['0.8', '0.081', '0.0079'], blanco: '' } }
+const c = correspondencia([fila], oc)
+assert.deepEqual(c.ind.map((p) => p.k), [0, 1, 2])
+cerca(c.ind[1].y, 150e5 / 0.1 / 10)
+assert.equal(c.prom.length, 3)
+const L = linealidadOD([fila], oc, 0.005)
+assert.ok(L.factor > 9.5 && L.factor < 10.5, 'factor ' + L.factor)
 assert.equal(t.filas[0].conteos, undefined)
 assert.equal(t.filas[0].od.blanco, undefined)
 console.log('Todas las pruebas pasaron.')

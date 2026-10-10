@@ -52,7 +52,7 @@ export function ArchivoTab({ s }) {
             <li><code>Réplica</code> (opcional; si no está, se toma del nombre —L100A1₂, L100A1_2, L100A1 (2)— o se numera por orden dentro de cada muestra y tiempo).</li>
             <li><code>Volumen (µL)</code> (opcional; si viene, se desactiva «volumen fijo»).</li>
             <li><code>Sin diluir</code>, <code>-1</code>, <code>-2</code>… (también <code>10^-3</code>, <code>10⁻³</code>, <code>1e-3</code>).</li>
-            <li>OD: <code>OD</code>, <code>OD 2</code>…, <code>Blanco</code>, <code>Dilución lectura OD</code>, <code>Origen OD</code> (misma / paralelo). Pueden ir en la misma hoja o en otra.</li>
+            <li>OD por dilución: <code>OD sin diluir</code> (o <code>OD</code>), <code>OD -1</code>, <code>OD -2</code>…, y opcionalmente <code>Blanco</code> y <code>Origen OD</code> (misma / paralelo). Pueden ir en la misma hoja que los recuentos o en otra.</li>
           </ul>
           <button className="primario" onClick={() => plantilla().then((b) => descargarBlob(b, 'plantilla_recuento_ufc.xlsx'))}>Descargar plantilla con ejemplo</button>
         </section>
