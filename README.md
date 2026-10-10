@@ -9,7 +9,7 @@ Todo se calcula en el navegador: no hace falta instalar nada y los datos no se e
 | Pestaña | Qué hace |
 |---|---|
 | Archivo | Guardar/cargar sesión, plantilla de Excel. |
-| Datos | Grilla tipo Excel: muestra, tiempo (h por defecto), réplica (se numera sola en cada muestra y tiempo), dilución previa, «Sin diluir», −1 … −10 (botón **+** para agregar más). Siempre hay una fila vacía lista abajo; Enter en Muestra o Tiempo vacíos copia el de arriba; los nombres de muestra se guardan. Volumen sembrado fijo (opcional por fila). Se puede cargar un Excel o pegar una tabla: con encabezados cada dato va a su fila por muestra, tiempo y réplica. |
+| Datos | Grilla tipo Excel: muestra, tiempo (h por defecto), réplica (se numera sola en cada muestra y tiempo), «Sin diluir», −1 … −10 (botón **+** para agregar más). Siempre hay una fila vacía lista abajo; Enter en Muestra o Tiempo vacíos copia el de arriba; los nombres de muestra se guardan. Volumen sembrado fijo (opcional por fila). Se puede cargar un Excel o pegar una tabla: con encabezados cada dato va a su fila por muestra, tiempo y réplica. |
 | OD | Longitud de onda, lecturas (una o varias), blanco (o «lecturas ya corregidas por el blanco»), dilución de la lectura, origen de la OD (misma suspensión o cultivo paralelo) y OD en el tiempo. |
 | Tabla | Correspondencia UFC/mL ↔ OD por réplica (por defecto) o promediada, y factor de conversión directo. |
 | Curva | Cinco modelos (lineal, proporcional, cuadrático, log–log, semilog), ponderación por error proporcional, bandas de confianza y predicción, comparación por AICc, residuos, interpretación automática y calculadora OD ↔ UFC/mL. |

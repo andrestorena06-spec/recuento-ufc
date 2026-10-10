@@ -4,7 +4,7 @@ import { PanelGrafico } from './panelGrafico.jsx'
 import { Grilla, columnasBase } from './grilla.jsx'
 import { importarArchivo } from './importar.js'
 import { claveGrupo, etiquetaGrupo, filaEnUso, filaVacia, tNorm, tNum, UNIDADES_T } from '../modelo.js'
-import { calcularFila, cient, ESTADOS, INCONTABLE, leerConteo, leerFactor, METODOS_UFC, RANGOS, rangoDe, sup, textoResultado, esValor, nombreRep } from '../ufc.js'
+import { calcularFila, cient, ESTADOS, INCONTABLE, leerConteo, METODOS_UFC, RANGOS, rangoDe, sup, textoResultado, esValor, nombreRep } from '../ufc.js'
 import { resumen, finito } from '../estadistica.js'
 import { excelDe, plantilla } from '../excel.js'
 import { descargarBlob, paletaMuestras } from '../utils.js'
@@ -41,7 +41,6 @@ export function DatosTab({ s }) {
   const [L, U] = rangoDe(o)
   const u = o.unidadTiempo || 'h'
   const resultados = useMemo(() => Object.fromEntries(filas.map((f) => [f.id, calcularFila(f, o)])), [filas, o])
-  const hayPrevia = filas.some((f) => String(f.dprev ?? '').trim() !== '' && leerFactor(f.dprev) !== 1)
   const resumenG = useMemo(() => resumenGrupos(filas, o), [filas, o])
   const muestras = [...new Set(resumenG.map((r) => r.muestra))]
   const colores = paletaMuestras(muestras)
@@ -59,11 +58,6 @@ export function DatosTab({ s }) {
       id: 'vol', titulo: 'Vol.', sub: 'µL', ayuda: `Volumen sembrado en cada placa. Vacío = ${o.volDef} µL`, estilo: { minWidth: 58 },
       placeholder: () => String(o.volDef), get: (f) => f.vol, set: (f, v) => ({ ...f, vol: v }),
     }]),
-    {
-      id: 'dprev', titulo: 'Dil. previa', sub: '1:F', ayuda: 'Dilución de la suspensión «sin diluir» respecto de la muestra madre (1, 1:10, 100, 10^-2…)',
-      estilo: { minWidth: 64 }, placeholder: () => '1', clase: (f) => (finito(leerFactor(f.dprev)) ? '' : 'mal'),
-      get: (f) => f.dprev, set: (f, v) => ({ ...f, dprev: v }),
-    },
     // columnas de dilución (una más de reserva para que pegar un bloque más ancho agregue columnas)
     ...Array.from({ length: K + 4 }, (_, k) => ({
       id: 'c' + k, titulo: etiquetaDil(k), sub: k ? '10' + sup(-k) : '', oculta: k >= K, ayuda: k ? `Dilución 10⁻${k}` : 'Suspensión sin diluir',
@@ -83,7 +77,7 @@ export function DatosTab({ s }) {
   }
 
   const agregarReplica = (f) => {
-    const nueva = { ...filaVacia(f.muestra, '', K, s.M), tiempo: f.tiempo, vol: f.vol, dprev: f.dprev }
+    const nueva = { ...filaVacia(f.muestra, '', K, s.M), tiempo: f.tiempo, vol: f.vol }
     const ultimo = filas.map((x) => claveGrupo(x.muestra, x.tiempo)).lastIndexOf(claveGrupo(f.muestra, f.tiempo))
     s.setFilas([...filas.slice(0, ultimo + 1), nueva, ...filas.slice(ultimo + 1)])
   }
@@ -107,17 +101,17 @@ export function DatosTab({ s }) {
 
   const exportar = () => {
     const tCol = `Tiempo (${u})`
-    const cols = ['Muestra', tCol, 'Réplica', 'Volumen (µL)', 'Dilución previa', ...Array.from({ length: K }, (_, k) => etiquetaDil(k).replace('−', '-')),
-      'Diluciones usadas', 'UFC/mL', 'IC95 inferior', 'IC95 superior', 'log10 UFC/mL', 'UFC/mL madre', 'log10 UFC/mL madre', 'Estado', 'Avisos']
+    const cols = ['Muestra', tCol, 'Réplica', 'Volumen (µL)', ...Array.from({ length: K }, (_, k) => etiquetaDil(k).replace('−', '-')),
+      'Diluciones usadas', 'UFC/mL', 'IC95 inferior', 'IC95 superior', 'log10 UFC/mL', 'Estado', 'Avisos']
     const datos = enUso.map((f) => {
       const r = resultados[f.id]
       const val = ESTADOS[r.estado][1] !== 'vacio'
       return {
-        Muestra: f.muestra, [tCol]: finito(tNum(f.tiempo)) ? tNum(f.tiempo) : f.tiempo, Réplica: f.rep, 'Volumen (µL)': r.V * 1000, 'Dilución previa': leerFactor(f.dprev),
+        Muestra: f.muestra, [tCol]: finito(tNum(f.tiempo)) ? tNum(f.tiempo) : f.tiempo, Réplica: f.rep, 'Volumen (µL)': r.V * 1000,
         ...Object.fromEntries(f.conteos.map((c, k) => { const v = leerConteo(c); return [etiquetaDil(k).replace('−', '-'), v === INCONTABLE ? 'INC' : v] })),
         'Diluciones usadas': r.dils.map((k) => (k === 0 ? '0' : '-' + k)).join(', '),
         'UFC/mL': val ? r.N : null, 'IC95 inferior': val ? r.ic[0] : null, 'IC95 superior': val ? r.ic[1] : null, 'log10 UFC/mL': r.log,
-        'UFC/mL madre': val ? r.Nmadre : null, 'log10 UFC/mL madre': r.logMadre, Estado: ESTADOS[r.estado][0], Avisos: r.avisos.join('; '),
+        Estado: ESTADOS[r.estado][0], Avisos: r.avisos.join('; '),
       }
     })
     const colsM = ['Muestra', tCol, 'Réplicas', 'n con valor', 'Media log10 UFC/mL', 'DE log10', 'Media geométrica UFC/mL', 'IC95 inf', 'IC95 sup', 'Media aritmética UFC/mL', 'CV %']
@@ -172,13 +166,12 @@ export function DatosTab({ s }) {
         <Grilla s={s} columnas={columnas} sel={sel} onSel={setSel} normalizar={normalizar}
           cabExtra={<><button className="mas" title="Agregar una dilución más" onClick={agregarColumna}>+</button>{' '}
             <button className="mini" title="Quitar la última dilución" onClick={quitarColumna} disabled={K <= 1}>−</button></>}
-          cabResultados={['UFC/mL', 'IC 95 %', ...(hayPrevia ? ['UFC/mL madre'] : []), 'Estado', 'Avisos']}
+          cabResultados={['UFC/mL', 'IC 95 %', 'Estado', 'Avisos']}
           resultados={(f) => {
             const res = resultados[f.id]
             return <>
               <td className="res"><b>{textoResultado(res)}</b></td>
               <td className="res">{finito(res.ic[0]) && ESTADOS[res.estado][1] !== 'cens' ? `${cient(res.ic[0], 1)} – ${cient(res.ic[1], 1)}` : ''}</td>
-              {hayPrevia && <td className="res">{ESTADOS[res.estado][1] === 'vacio' ? '–' : cient(res.Nmadre)}</td>}
               <td className="res" style={{ textAlign: 'center' }}><span className={`estado ${ESTADOS[res.estado][1]}`}>{ESTADOS[res.estado][0]}</span></td>
               <td className="res avisos-fila">{res.avisos.join(' · ')}</td>
             </>
@@ -203,7 +196,7 @@ export function DatosTab({ s }) {
       {resumenG.length > 0 && (
         <div className="rejilla-2">
           <section className="tarjeta">
-            <h2>Por muestra y tiempo <small className="ayuda">(UFC/mL de la muestra madre)</small></h2>
+            <h2>Por muestra y tiempo <small className="ayuda">(UFC/mL)</small></h2>
             <div className="tabla-scroll">
               <table className="tabla">
                 <thead><tr><th>Muestra</th><th>Tiempo ({u})</th><th>n</th><th>Media geométrica</th><th>IC 95 % de la media</th><th>log₁₀ ± DE</th><th>CV %</th></tr></thead>
@@ -279,7 +272,7 @@ function GraficoUFC({ s, resumenG, colores }) {
   }).filter(Boolean)
   const medias = resumenG.filter((m) => m.n).map((m) => ({ muestra: m.muestra, t: m.t, etiqueta: m.etiqueta, y: m.geo,
     err: m.n > 1 ? [10 ** (m.logMedia - m.logDe), 10 ** (m.logMedia + m.logDe)] : null }))
-  return <GraficoTiempo s={s} valores={valores} medias={medias} colores={colores} ejeY="UFC/mL (muestra madre)" log estilo={s.estilos.muestras} nombre="muestras" />
+  return <GraficoTiempo s={s} valores={valores} medias={medias} colores={colores} ejeY="UFC/mL" log estilo={s.estilos.muestras} nombre="muestras" />
 }
 
 // Recuento observado en cada dilución frente al esperado con la estimación (diagnóstico de la serie)

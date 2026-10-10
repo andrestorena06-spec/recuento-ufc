@@ -51,7 +51,7 @@ export function TablaTab({ s }) {
       return {
         Muestra: p.muestra, [`Tiempo (${u})`]: tv(p), Réplica: p.rep, [`OD${onda} neta`]: r4(p.x), 'Lecturas OD': p.d.n, 'Dil. lectura OD': p.d.Fod,
         'UFC/mL (suspensión leída)': r3s(p.y), 'IC95 inf': r3s(p.ic[0]), 'IC95 sup': r3s(p.ic[1]), 'log10 UFC/mL': r4(Math.log10(p.y), 3),
-        'UFC/mL madre': r3s(p.r.Nmadre), 'UFC/mL por unidad de OD': r3s(p.y / p.x), 'Recuento': ESTADOS[p.r.estado][0],
+        'UFC/mL de la muestra': r3s(p.r.Nmadre), 'UFC/mL por unidad de OD': r3s(p.y / p.x), 'Recuento': ESTADOS[p.r.estado][0],
         'Diluciones usadas': p.r.dils.map((k) => (k ? '-' + k : '0')).join(', '),
         'Origen OD': p.origen === 'paralelo' ? 'Cultivo paralelo' : 'Misma suspensión', 'En la curva': enC,
       }
@@ -93,8 +93,7 @@ export function TablaTab({ s }) {
           </div>
         </div>
         <p className="ayuda" style={{ marginTop: 0 }}>
-          La UFC/mL que se compara con cada OD es la de <b>la suspensión cuya OD se leyó</b>: UFC/mL de la muestra madre (recuento × 10ᵏ / volumen × dilución previa)
-          ÷ factor de dilución de la lectura de OD. {o.modo === 'promedio'
+          La UFC/mL que se compara con cada OD es la de <b>la suspensión cuya OD se leyó</b>: UFC/mL de la muestra (recuento × 10ᵏ / volumen) ÷ factor de dilución de la lectura de OD (1 si la OD se leyó sin diluir). {o.modo === 'promedio'
             ? 'En modo promedio la OD es la media aritmética y la UFC/mL la media geométrica de las réplicas válidas.'
             : 'En modo individual cada réplica es un punto; las muestras con OD de cultivo paralelo entran con sus promedios.'}
         </p>

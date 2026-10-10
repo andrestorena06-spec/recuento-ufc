@@ -75,7 +75,7 @@ export const tieneEncabezados = (m) => m.slice(0, 3).some((f) => f.some((c) => R
 const RE_MUESTRA = /^(muestra|muestras|sample|cepa|nombre)/
 
 // Busca en la matriz la fila de encabezados (la que tiene "Muestra") y arma filas de datos.
-// Reconoce columnas de tiempo, réplica, volumen, dilución previa, recuento (Sin diluir, -1 … -n)
+// Reconoce columnas de tiempo, réplica, volumen, recuento (Sin diluir, -1 … -n)
 // y OD (OD, Lectura…, Blanco, Dilución OD, Origen). Un campo cuya columna no está queda undefined:
 // al combinar con filas existentes solo se cambia lo que trae la tabla.
 export function interpretarTabla(m) {
@@ -87,11 +87,10 @@ export function interpretarTabla(m) {
   const iT = col(/^(tiempo|time|t|t \(.*\)|hora|horas|h|min|minutos|dia|dias)$|^tiempo/)
   const iR = col(/^(replica|rep\b|rep\.|n replica|r$)/)
   const iV = col(/^(vol|volumen)/)
-  const iP = col(/(previa|madre|dil.*prev|factor)/)
   const iBl = col(/^(blanco|blank)/)
   const iDod = col(/(dil.*od|od.*dil|dil.*lectura|lectura.*dil)/)
   const iOr = col(/^(origen)/)
-  const usadas = new Set([iM, iT, iR, iV, iP, iBl, iDod, iOr])
+  const usadas = new Set([iM, iT, iR, iV, iBl, iDod, iOr])
   const dils = cab.map((c, j) => (usadas.has(j) ? null : columnaDilucion(m[iCab][j])))
   const iOD = cab.map((c, j) => (!usadas.has(j) && /^(od|do|abs|absorbancia|lectura)(\s|\d|$|_|\.)/.test(c) ? j : -1)).filter((j) => j >= 0)
   const K = Math.max(-1, ...dils.filter((d) => d !== null)) + 1
@@ -114,7 +113,6 @@ export function interpretarTabla(m) {
     filas.push({
       muestra, rep, repExplicita, tiempo: iT >= 0 ? tiempo : undefined,
       vol: iV >= 0 ? texto(f[iV]) : undefined,
-      dprev: iP >= 0 ? texto(f[iP]) : undefined,
       conteos,
       od: iOD.length || iBl >= 0 || iDod >= 0 ? {
         lecturas: iOD.length ? iOD.map((j) => texto(f[j])) : undefined,
@@ -146,8 +144,8 @@ export async function excelDe(hojas) {
 
 export async function plantilla() {
   const dil = Array.from({ length: 10 }, (_, i) => `-${i + 1}`)
-  const cols = ['Muestra', 'Tiempo (h)', 'Réplica', 'Dilución previa', 'Sin diluir', ...dil]
-  const ej = (m, t, r, c) => ({ Muestra: m, 'Tiempo (h)': t, Réplica: r, 'Dilución previa': '1', ...Object.fromEntries(c.map((v, i) => [i === 0 ? 'Sin diluir' : `-${i}`, v])) })
+  const cols = ['Muestra', 'Tiempo (h)', 'Réplica', 'Sin diluir', ...dil]
+  const ej = (m, t, r, c) => ({ Muestra: m, 'Tiempo (h)': t, Réplica: r, ...Object.fromEntries(c.map((v, i) => [i === 0 ? 'Sin diluir' : `-${i}`, v])) })
   const filas = [
     ej('L100A1', 0, 1, ['', '', '', 'INC', 152, 14, 2]),
     ej('L100A1', 0, 2, ['', '', '', 'INC', 139, 17, 0]),
@@ -166,10 +164,9 @@ export async function plantilla() {
     ['Hoja «Recuentos»: una fila por réplica. Tiempo = momento de la toma (las réplicas se numeran dentro de cada muestra y tiempo). Columnas «Sin diluir», «-1», «-2»… = colonias contadas en la placa de cada dilución 1:10.'],
     ['Celda vacía = esa dilución no se sembró. 0 = se sembró y no creció nada. INC (o MNPC, TNTC, >300) = incontable.'],
     ['Volumen: por defecto es fijo (se elige en el programa). Si cambia entre filas, agregá una columna «Volumen (µL)».'],
-    ['Dilución previa: dilución de la suspensión «sin diluir» respecto de la muestra madre (1 = es la madre; 1:100, 100 o 10^-2 = diluida 100 veces).'],
     ['La réplica puede ir en su columna o en el nombre: L100A1₁, L100A1_1, L100A1 (1).'],
     ['Hoja «OD»: OD 1, OD 2… = lecturas de la misma suspensión (se promedian). Blanco = OD del medio estéril; si el equipo ya da la OD corregida, omití la columna.'],
-    ['Dilución lectura OD: si la OD se leyó en una dilución de la madre (para quedar en el rango lineal), su factor (1:10 = 10).'],
+    ['Dilución lectura OD: si la OD se leyó en una dilución de la muestra (para quedar en el rango lineal), su factor (1:10 = 10).'],
     ['Origen OD: «misma» = la OD se leyó en la misma suspensión que se sembró; «paralelo» = en otro cultivo hecho en las mismas condiciones.'],
   ]
   return excelDe([

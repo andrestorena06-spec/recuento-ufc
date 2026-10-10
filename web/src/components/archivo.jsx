@@ -50,7 +50,7 @@ export function ArchivoTab({ s }) {
           <ul className="ayuda">
             <li><code>Tiempo</code> (opcional; en la unidad elegida en Datos).</li>
             <li><code>Réplica</code> (opcional; si no está, se toma del nombre —L100A1₂, L100A1_2, L100A1 (2)— o se numera por orden dentro de cada muestra y tiempo).</li>
-            <li><code>Dilución previa</code> y <code>Volumen (µL)</code> (opcionales; si viene el volumen se desactiva «volumen fijo»).</li>
+            <li><code>Volumen (µL)</code> (opcional; si viene, se desactiva «volumen fijo»).</li>
             <li><code>Sin diluir</code>, <code>-1</code>, <code>-2</code>… (también <code>10^-3</code>, <code>10⁻³</code>, <code>1e-3</code>).</li>
             <li>OD: <code>OD</code>, <code>OD 2</code>…, <code>Blanco</code>, <code>Dilución lectura OD</code>, <code>Origen OD</code> (misma / paralelo). Pueden ir en la misma hoja o en otra.</li>
           </ul>

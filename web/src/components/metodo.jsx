@@ -13,7 +13,6 @@ export function MetodoTab({ s }) {
         <h3>1. Del recuento a UFC/mL</h3>
         <p>Cada columna es un paso de dilución 1:10. En la columna <code>−k</code> la suspensión está diluida 10<sup>k</sup> veces y en la placa se siembran <code>V</code> mL de ella. Si en esa placa crecen <code>C</code> colonias:</p>
         <p className="ecuacion">UFC/mL = C × 10ᵏ / V          (V en mL: 100 µL = 0,1 mL)</p>
-        <p>Si la suspensión «sin diluir» ya era una dilución 1:F de la muestra madre (dilución previa), <code>UFC/mL madre = UFC/mL × F</code>.</p>
         <p><i>Ejemplo:</i> 182 colonias en la placa −6 con 100 µL → 182 × 10⁶ / 0,1 = 1,82 × 10⁹ UFC/mL.</p>
 
         <h3>2. Rango contable</h3>
@@ -76,7 +75,7 @@ export function MetodoTab({ s }) {
         <p><b>Misma suspensión</b>: cada réplica es un par real (OD, UFC/mL) y entra como un punto en modo individual. <b>Cultivo paralelo</b>: la réplica de OD y la de UFC son cultivos distintos, así que emparejarlas réplica a réplica es arbitrario; en modo individual esas muestras entran con un solo punto (OD media, UFC media geométrica). La variación entre cultivos se suma a la dispersión de la curva.</p>
 
         <h3>9. Correspondencia y curva de calibración</h3>
-        <p>Cada punto es: <code>x = OD neta</code> de la suspensión leída, <code>y = UFC/mL de esa misma suspensión</code> = UFC/mL madre ÷ dilución de la lectura.
+        <p>Cada punto es: <code>x = OD neta</code> de la suspensión leída, <code>y = UFC/mL de esa misma suspensión</code> = UFC/mL de la muestra ÷ dilución de la lectura de OD (1 si se leyó sin diluir).
           Se ajusta UFC en función de OD (y no al revés) porque el uso de la curva es predecir UFC a partir de una OD medida, y la OD tiene mucho menos error relativo que el recuento.</p>
         <h4>Modelos</h4>
         <ul>
@@ -102,7 +101,7 @@ export function MetodoTab({ s }) {
         <ol>
           <li>Partir de un cultivo en la fase de interés (normalmente exponencial) y hacer 5–8 diluciones (por ejemplo 1:2 sucesivas) que cubran el rango de OD que se va a usar, con al menos un orden de magnitud entre la menor y la mayor.</li>
           <li>Leer la OD de cada nivel (por duplicado o triplicado) y sembrar el mismo tubo en diluciones 1:10, cada nivel por triplicado.</li>
-          <li>Cargar cada nivel como una muestra (o como réplicas con su <i>Dil. previa</i> respecto del cultivo madre) con origen «misma suspensión».</li>
+          <li>Cargar cada nivel como una muestra con origen «misma suspensión».</li>
           <li>Usar la curva solo dentro del rango de OD calibrado y con el mismo equipo, longitud de onda, cepa, medio y fase de crecimiento.</li>
         </ol>
 

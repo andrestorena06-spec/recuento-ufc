@@ -26,9 +26,9 @@ cerca(r.N, 276 / (0.1e-3 + 0.1e-4))
 // una sola dilución
 r = calcularFila({ conteos: ['INC', 'INC', 'INC', 245, 31, 2] }, { ...o, metodo: 'una' })
 assert.deepEqual(r.dils, [3])
-// dilución previa respecto de la madre
-r = calcularFila({ dprev: '1:100', conteos: ['', 120] }, o)
-cerca(r.Nmadre, 120 * 10 / 0.1 * 100)
+// sin dilución previa: el resultado de la muestra es el de la placa
+r = calcularFila({ conteos: ['', 120] }, o)
+cerca(r.Nmadre, 120 * 10 / 0.1)
 assert.deepEqual(['1', '10', '1:10', '1/100', '10^-2', '1e-2', '-2'].map(leerFactor), [1, 10, 10, 100, 100, 100, 100])
 
 // IC de Poisson exacto (valores de poisson.test de R)

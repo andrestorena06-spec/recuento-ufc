@@ -3,7 +3,7 @@
 //
 // Columna k (0 = sin diluir, 1 = 10⁻¹, …): cada placa recibe V mL de la suspensión
 // diluida 10⁻ᵏ, es decir V·10⁻ᵏ mL de la suspensión de partida. Si la suspensión de
-// partida ya era una dilución 1:F de la muestra madre, UFC/mL(madre) = UFC/mL × F.
+// partida. (Los campos «madre» se conservan por compatibilidad y son iguales a N.)
 //
 // Estimador (ISO 7218 / FDA BAM cap. 3):  N = ΣC / Σ(V·10⁻ᵏ)  sobre las placas retenidas.
 // Con una placa por dilución es la fórmula ΣC / [V·(n₁ + 0,1·n₂)·d]. Es además el estimador
@@ -37,7 +37,7 @@ export function leerConteo(v) {
   return finito(n) && n >= 0 ? Math.round(n) : null
 }
 
-// Factor de dilución previa respecto de la muestra madre: "1", "10", "1:10", "1/100", "10^-2", "1e-2", "-2"
+// Factor de dilución (se usa para la dilución de la lectura de OD): "1", "10", "1:10", "1/100", "10^-2", "1e-2", "-2"
 export function leerFactor(v) {
   if (v === null || v === undefined || String(v).trim() === '') return 1
   if (typeof v === 'number') return v > 0 ? (v < 1 ? 1 / v : v) : NaN
@@ -63,11 +63,10 @@ export const rangoDe = (o) => {
 export function calcularFila(fila, o) {
   const [L, U] = rangoDe(o)
   const V = ((o.volFijo ? NaN : Number(fila.vol)) || Number(o.volDef) || 100) / 1000 // mL
-  const F = leerFactor(fila.dprev)
+  const F = 1
   const placas = (fila.conteos || []).map((c, k) => ({ k, c: leerConteo(c), q: V * 10 ** -k })).filter((p) => p.c !== null)
   const avisos = []
   const out = { V, F, placas, avisos, estado: 'vacio', N: NaN, ic: [NaN, NaN], usadas: [], sumaC: NaN, sumaQ: NaN, pChi: NaN }
-  if (!finito(F)) avisos.push('Dilución previa no válida')
   if (!placas.length) return terminar(out)
 
   // serie coherente: al diluir 10 veces el recuento no puede aumentar

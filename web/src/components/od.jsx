@@ -36,7 +36,7 @@ export function ODTab({ s }) {
       placeholder: () => o.blancoOD || '0', get: (f) => f.od.blanco, set: (f, v) => ({ ...f, od: { ...f.od, blanco: v } }),
     }]),
     {
-      id: 'dil', titulo: 'Dil. lectura', sub: '1:F', ayuda: 'Factor de dilución de la suspensión leída respecto de la madre', estilo: { minWidth: 64 },
+      id: 'dil', titulo: 'Dil. lectura', sub: '1:F', ayuda: 'Factor de dilución de la suspensión leída respecto de la muestra', estilo: { minWidth: 64 },
       placeholder: () => '1', clase: (f) => (finito(leerFactor(f.od.dil)) ? '' : 'mal'), get: (f) => f.od.dil, set: (f, v) => ({ ...f, od: { ...f.od, dil: v } }),
     },
   ]
@@ -88,14 +88,14 @@ export function ODTab({ s }) {
         <p className="ayuda" style={{ marginTop: 0 }}>
           Las filas son las mismas que en Datos (muestra, tiempo y réplica). OD 1, 2… = lecturas repetidas de la misma suspensión (se promedian).
           {o.blancoCorregido ? ' OD neta = media de las lecturas.' : ' OD neta = media de las lecturas − blanco (el de la fila o, si está vacío, el general).'}
-          {' '}Dil. lectura = si la OD se leyó en una dilución de la madre para quedar en el rango lineal (1:10 → 10).
+          {' '}Dil. lectura = si la OD se leyó en una dilución de la muestra para quedar en el rango lineal (1:10 → 10).
           {o.equipo === 'placa' && ' En lector de microplacas el camino óptico depende del volumen del pocillo: usá siempre el mismo volumen y no mezcles la curva con lecturas de cubeta.'}
         </p>
 
         <Grilla s={s} columnas={columnas}
           cabExtra={<><button className="mas" title="Agregar otra lectura" onClick={agregarLectura}>+</button>{' '}
             <button className="mini" title="Quitar la última lectura" onClick={quitarLectura} disabled={M <= 1}>−</button></>}
-          cabResultados={['OD neta', 'DE', 'Origen de la OD (por muestra)', 'UFC/mL madre']}
+          cabResultados={['OD neta', 'DE', 'Origen de la OD (por muestra)', 'UFC/mL']}
           resultados={(f) => {
             const d = odDeFila(f, o)
             const rc = calcularFila(f, o)
