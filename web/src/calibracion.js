@@ -4,60 +4,67 @@
 // ============================================================
 import { finito, media, desvio, mco, varAjuste, tCuantil, shapiroWilk, resumen } from './estadistica.js'
 import { calcularFila, esValor, leerFactor } from './ufc.js'
+import { claveGrupo, etiquetaGrupo, filaEnUso, tNorm, tNum } from './modelo.js'
 
-// OD neta de una fila: media de las lecturas menos el blanco (de la fila o el general)
+// OD neta de una fila: media de las lecturas menos el blanco (de la fila o el general).
+// Con «lecturas ya corregidas por el blanco» el blanco es 0.
 export function odDeFila(fila, o) {
-  const lect = (fila.od?.lecturas || []).map((v) => Number(String(v ?? '').replace(',', '.'))).filter((v, i) => finito(v) && String(fila.od.lecturas[i] ?? '').trim() !== '')
-  const bl = String(fila.od?.blanco ?? '').trim() !== '' ? Number(String(fila.od.blanco).replace(',', '.')) : Number(o.blancoOD) || 0
+  const txt = (fila.od?.lecturas || []).map((v) => String(v ?? '').trim())
+  const lect = txt.filter((v) => v !== '').map((v) => Number(v.replace(',', '.'))).filter(finito)
+  let bl = 0
+  if (!o.blancoCorregido) bl = String(fila.od?.blanco ?? '').trim() !== '' ? Number(String(fila.od.blanco).replace(',', '.')) : Number(String(o.blancoOD ?? '').replace(',', '.')) || 0
   const netas = lect.map((v) => v - (finito(bl) ? bl : 0))
   const Fod = leerFactor(fila.od?.dil)
   return { n: netas.length, od: netas.length ? media(netas) : NaN, de: netas.length > 1 ? desvio(netas) : NaN, crudas: lect, blanco: bl, Fod }
 }
 
-// Arma la tabla de correspondencia. modo: 'individual' | 'promedio'
-export function correspondencia(filas, o) {
+// Arma la tabla de correspondencia. Cada grupo es una muestra en un tiempo; sus filas son las réplicas.
+export function correspondencia(filasTodas, o) {
+  const filas = filasTodas.filter(filaEnUso)
+  const u = o.unidadTiempo || 'h'
   const ind = filas.map((f) => {
     const r = calcularFila(f, o)
     const d = odDeFila(f, o)
     // UFC/mL en la suspensión cuya OD se leyó = UFC/mL madre / factor de dilución de la lectura
     const y = r.Nmadre / d.Fod
     return {
-      id: f.id, muestra: f.muestra, rep: f.rep, r, d, x: d.od, y,
-      ic: r.icMadre.map((v) => v / d.Fod), valido: esValor(r, o.incluirEstimados) && finito(d.od) && finito(y),
+      id: f.id, muestra: f.muestra, tiempo: tNorm(f.tiempo), t: tNum(f.tiempo), rep: f.rep,
+      grupo: claveGrupo(f.muestra, f.tiempo), etiqueta: etiquetaGrupo(f.muestra, f.tiempo, u),
+      r, d, x: d.od, y, ic: r.icMadre.map((v) => v / d.Fod),
+      valido: esValor(r, o.incluirEstimados) && finito(d.od) && finito(y),
       origen: o.origenOD?.[f.muestra] || 'misma',
     }
   })
-  const muestras = [...new Set(filas.map((f) => f.muestra))]
-  const prom = muestras.map((m) => {
-    const g = ind.filter((p) => p.muestra === m)
+  const grupos = [...new Set(ind.map((p) => p.grupo))]
+  const muestras = [...new Set(ind.map((p) => p.muestra))]
+  const prom = grupos.map((gk) => {
+    const g = ind.filter((p) => p.grupo === gk)
     const ok = g.filter((p) => p.valido)
     // para la OD se usan todas las réplicas con lectura; para las UFC solo las que dan un valor
-    const ods = g.map((p) => p.x).filter(finito)
-    const logs = ok.map((p) => Math.log10(p.y)).filter(finito)
-    const rx = resumen(ods)
-    const ry = resumen(logs)
+    const rx = resumen(g.map((p) => p.x).filter(finito))
+    const ry = resumen(ok.map((p) => Math.log10(p.y)).filter(finito))
     return {
-      id: 'm:' + m, muestra: m, rep: null, nOD: rx.n, nUFC: ry.n, x: rx.media, xde: rx.de,
+      id: 'g:' + gk, grupo: gk, muestra: g[0].muestra, tiempo: g[0].tiempo, t: g[0].t, etiqueta: g[0].etiqueta, rep: null,
+      nOD: rx.n, nUFC: ry.n, x: rx.media, xde: rx.de,
       logMedia: ry.media, logDe: ry.de, logIc: ry.ic, y: 10 ** ry.media,
       yAritm: ok.length ? media(ok.map((p) => p.y)) : NaN,
-      valido: rx.n > 0 && ry.n > 0, origen: o.origenOD?.[m] || 'misma',
+      valido: rx.n > 0 && ry.n > 0, origen: g[0].origen,
     }
   })
-  return { ind, prom, muestras }
+  return { ind, prom, grupos, muestras }
 }
 
 // Puntos que entran en la curva según el modo. En modo individual, las muestras cuya OD viene
 // de un cultivo paralelo (no de la misma suspensión) no se pueden emparejar réplica a réplica:
-// aportan su promedio.
+// aportan el promedio de cada tiempo.
 export function puntosCurva(c, modo) {
   if (modo === 'promedio') return c.prom.filter((p) => p.valido).map((p) => ({ ...p, tipo: 'promedio' }))
   const out = []
-  c.muestras.forEach((m) => {
-    const pm = c.prom.find((p) => p.muestra === m)
+  c.prom.forEach((pm) => {
     if (pm.origen === 'paralelo') {
       if (pm.valido) out.push({ ...pm, tipo: 'promedio' })
     } else {
-      c.ind.filter((p) => p.muestra === m && p.valido).forEach((p) => out.push({ ...p, tipo: 'individual' }))
+      c.ind.filter((p) => p.grupo === pm.grupo && p.valido).forEach((p) => out.push({ ...p, tipo: 'individual' }))
     }
   })
   return out
@@ -212,7 +219,7 @@ export const tParaN = (n) => tCuantil(0.975, n - 1)
 // Puntos de la curva con el motivo por el que alguno queda fuera del ajuste
 export function datosCurva(corr, o) {
   const todos = puntosCurva(corr, o.modo).map((p) => {
-    const key = p.tipo === 'promedio' ? 'm:' + p.muestra : 'i:' + p.id
+    const key = p.tipo === 'promedio' ? p.id : 'i:' + p.id
     const odMin = String(o.odMin ?? '').trim() === '' ? -Infinity : Number(o.odMin)
     const odMax = String(o.odMax ?? '').trim() === '' ? Infinity : Number(o.odMax)
     let motivo = ''

@@ -51,7 +51,8 @@ export function MetodoTab({ s }) {
           Un p &lt; 0,05 indica que los recuentos no bajan 10 veces por dilución como deberían (error de dilución, pipeta descalibrada, colonias superpuestas o agregados). El gráfico «Serie de diluciones» de la fila seleccionada lo muestra visualmente.
           También se avisa si el recuento aumenta al diluir o si hay una placa incontable después de una contable.</p>
 
-        <h3>6. Réplicas y promedios</h3>
+        <h3>6. Réplicas, tiempo y promedios</h3>
+        <p>Cada fila es una réplica de una <b>muestra en un tiempo</b>. Las réplicas se numeran dentro de cada muestra y tiempo (en t = 0 h: 1, 2, 3; en t = 2 h vuelven a empezar), y los promedios, la tabla de correspondencia y los puntos promediados de la curva se calculan por muestra y tiempo.</p>
         <p>Los recuentos bacterianos tienen distribución aproximadamente <b>log-normal</b>: los errores son multiplicativos (una réplica el doble de otra es tan probable como una la mitad). Por eso se promedia en escala logarítmica:</p>
         <ul>
           <li><b>Media geométrica</b> = 10^(media de log₁₀ UFC/mL). Es el valor que se informa.</li>

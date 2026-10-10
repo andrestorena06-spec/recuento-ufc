@@ -4,7 +4,7 @@ import { PanelGrafico } from './panelGrafico.jsx'
 import { ModoSel } from './tabla.jsx'
 import { ondaDe } from './od.jsx'
 import { ajustar, datosCurva, interpretar, MODELOS, odParaUFC } from '../calibracion.js'
-import { cient, fmtP, leerFactor, nombreRep } from '../ufc.js'
+import { cient, fmtP, leerFactor } from '../ufc.js'
 import { finito } from '../estadistica.js'
 import { paletaMuestras } from '../utils.js'
 import { excelDe } from '../excel.js'
@@ -20,7 +20,13 @@ export function CurvaTab({ s }) {
   const ajustes = useMemo(() => Object.fromEntries(Object.keys(MODELOS).map((m) => [m, ajustar(usados, m, o.ponderacion)])), [usados, o.ponderacion])
   const aj = ajustes[o.modelo]
   const ok = aj && !aj.error
-  const colores = paletaMuestras(s.corr.muestras)
+  const u = o.unidadTiempo || 'h'
+  const tiempos = [...new Set(s.corr.ind.map((p) => p.tiempo))].sort((a, b) => (Number(a) - Number(b)) || String(a).localeCompare(String(b)))
+  const porTiempo = o.colorPor === 'tiempo'
+  const colM = paletaMuestras(s.corr.muestras)
+  const colT = paletaMuestras(tiempos)
+  const colorDe = (p) => (porTiempo ? colT[p.tiempo] : colM[p.muestra])
+  const nombreDe = (p) => (p.tipo === 'promedio' ? `${p.etiqueta} (promedio)` : `${p.etiqueta}, réplica ${p.rep}`)
   const [barras, setBarras] = useState(true)
 
   const alternar = (p) => {
@@ -49,12 +55,14 @@ export function CurvaTab({ s }) {
     if (barras && prom && p.nOD > 1) xErr = [p.x - p.xde, p.x + p.xde]
     if (barras && !prom && finito(p.ic?.[0])) yErr = p.ic
     return {
-      key: p.key, x: p.x, y: p.y, color: colores[p.muestra], excluido: !p.usado, forma: prom ? 'cuadrado' : 'circulo', yErr, xErr,
-      titulo: `${prom ? p.muestra + ' (promedio)' : nombreRep(p.muestra, p.rep)}\nOD = ${p.x.toFixed(3)} · ${cient(p.y)} UFC/mL${p.usado ? '' : '\nFuera del ajuste: ' + p.motivo}\nClic para ${p.usado ? 'excluir' : 'incluir'}`,
+      key: p.key, x: p.x, y: p.y, color: colorDe(p), excluido: !p.usado, forma: prom ? 'cuadrado' : 'circulo', yErr, xErr,
+      titulo: `${nombreDe(p)}\nOD = ${p.x.toFixed(3)} · ${cient(p.y)} UFC/mL${p.usado ? '' : '\nFuera del ajuste: ' + p.motivo}\nClic para ${p.usado ? 'excluir' : 'incluir'}`,
     }
   })
   const leyenda = [
-    ...s.corr.muestras.filter((m) => todos.some((p) => p.muestra === m)).slice(0, 14).map((m) => ({ texto: m || '(sin nombre)', color: colores[m] })),
+    ...(porTiempo
+      ? tiempos.filter((t) => todos.some((p) => p.tiempo === t)).slice(0, 14).map((t) => ({ texto: t === '' ? '(sin tiempo)' : `${t} ${u}`, color: colT[t] }))
+      : s.corr.muestras.filter((m) => todos.some((p) => p.muestra === m)).slice(0, 14).map((m) => ({ texto: m || '(sin nombre)', color: colM[m] }))),
     ...(ok ? [{ texto: MODELOS[o.modelo].corto, color: '#3a2a1e', linea: true }] : []),
     ...(ok && o.bandaC ? [{ texto: 'IC 95 % curva', color: '#d9731f', banda: true, opacidad: 0.3 }] : []),
     ...(ok && o.bandaP ? [{ texto: 'Predicción 95 %', color: '#8a7765', linea: true, dash: '4 4' }] : []),
@@ -70,8 +78,8 @@ export function CurvaTab({ s }) {
 
   const exportar = () => {
     const hojas = [{
-      nombre: 'Puntos', columnas: ['Muestra', 'Réplica', 'Tipo', 'OD', 'UFC/mL', 'En el ajuste', 'Motivo', 'UFC/mL ajustado', 'Residuo log10'],
-      filas: todos.map((p) => ({ Muestra: p.muestra, Réplica: p.rep ?? '', Tipo: p.tipo, OD: p.x, 'UFC/mL': p.y, 'En el ajuste': p.usado ? 'Sí' : 'No', Motivo: p.motivo,
+      nombre: 'Puntos', columnas: ['Muestra', `Tiempo (${u})`, 'Réplica', 'Tipo', 'OD', 'UFC/mL', 'En el ajuste', 'Motivo', 'UFC/mL ajustado', 'Residuo log10'],
+      filas: todos.map((p) => ({ Muestra: p.muestra, [`Tiempo (${u})`]: Number.isFinite(p.t) ? p.t : p.tiempo, Réplica: p.rep ?? '', Tipo: p.tipo, OD: p.x, 'UFC/mL': p.y, 'En el ajuste': p.usado ? 'Sí' : 'No', Motivo: p.motivo,
         'UFC/mL ajustado': ok ? aj.pred(p.x) : null, 'Residuo log10': ok && aj.pred(p.x) > 0 ? Math.log10(p.y / aj.pred(p.x)) : null })),
     }, {
       nombre: 'Modelos', columnas: ['Modelo', 'Ecuación', 'n', 'R2', 'R2 ajustado', 'RMSE log10', 'AICc', 'Error relativo medio %'],
@@ -105,6 +113,9 @@ export function CurvaTab({ s }) {
           <Campo label="Eje Y"><Select value={o.escalaY} onChange={(v) => s.setOpt('escalaY', v)} opciones={[['log', 'Log'], ['lin', 'Lineal']]} /></Campo>
           <Campo label="Eje X"><Select value={o.escalaX} onChange={(v) => s.setOpt('escalaX', v)} opciones={[['lin', 'Lineal'], ['log', 'Log']]} /></Campo>
         </div>
+        <Campo label="Color de los puntos">
+          <Select value={o.colorPor} onChange={(v) => s.setOpt('colorPor', v)} opciones={[['muestra', 'Por muestra'], ['tiempo', 'Por tiempo']]} />
+        </Campo>
         <Check label="Banda de confianza 95 % (de la curva)" checked={o.bandaC} onChange={(v) => s.setOpt('bandaC', v)} />
         <Check label="Banda de predicción 95 % (de una medición nueva)" checked={o.bandaP} onChange={(v) => s.setOpt('bandaP', v)} />
         <Check label="Barras de error en los puntos" checked={barras} onChange={setBarras}
@@ -154,7 +165,7 @@ export function CurvaTab({ s }) {
               </section>
             )}
             {ok && <Interpretacion ajustes={ajustes} aj={aj} usados={usados} />}
-            {ok && <Residuos s={s} aj={aj} colores={colores} ejeOD={ejeOD} />}
+            {ok && <Residuos s={s} aj={aj} colorDe={colorDe} nombreDe={nombreDe} ejeOD={ejeOD} />}
             {ok && <Calculadora aj={aj} xmin={xmin} xmax={xmax} onda={onda} />}
           </>
         )}
@@ -203,9 +214,9 @@ function Interpretacion({ ajustes, aj, usados }) {
   )
 }
 
-function Residuos({ s, aj, colores, ejeOD }) {
-  const puntos = aj.pts.map((p, i) => ({ key: p.key, x: p.x, y: aj.resGraf[i], color: colores[p.muestra], forma: p.tipo === 'promedio' ? 'cuadrado' : 'circulo', r: 4.5,
-    titulo: `${p.tipo === 'promedio' ? p.muestra : nombreRep(p.muestra, p.rep)}: residuo ${aj.resGraf[i].toPrecision(3)}` }))
+function Residuos({ s, aj, colorDe, nombreDe, ejeOD }) {
+  const puntos = aj.pts.map((p, i) => ({ key: p.key, x: p.x, y: aj.resGraf[i], color: colorDe(p), forma: p.tipo === 'promedio' ? 'cuadrado' : 'circulo', r: 4.5,
+    titulo: `${nombreDe(p)}: residuo ${aj.resGraf[i].toPrecision(3)}` }))
   const lim = Math.max(...aj.resGraf.map(Math.abs).filter(finito), 1e-9) * 1.15
   return (
     <section style={{ marginTop: 22 }}>
