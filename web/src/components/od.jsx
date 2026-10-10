@@ -3,8 +3,8 @@ import { Campo, Check, Modal, Select } from './ui.jsx'
 import { Grilla, columnasBase } from './grilla.jsx'
 import { GraficoTiempo, etiquetaDil } from './datos.jsx'
 import { importarArchivo } from './importar.js'
-import { etiquetaK, linealidadOD, odDeFila } from '../calibracion.js'
-import { filaEnUso } from '../modelo.js'
+import { etiquetaK, linealidadOD, odCorregida, odDeFila, resumenPorTiempo, ventanaLineal } from '../calibracion.js'
+import { etiquetaGrupo, filaEnUso, tNum } from '../modelo.js'
 import { calcularFila, cient, sup, textoResultado } from '../ufc.js'
 import { finito } from '../estadistica.js'
 import { paletaMuestras } from '../utils.js'
@@ -18,6 +18,7 @@ export function ODTab({ s }) {
   const [info, setInfo] = useState(false)
   const archivoRef = useRef()
   const u = o.unidadTiempo || 'h'
+  const lin = ventanaLineal(o)
 
   const setLectura = (i) => (f, v) => {
     const lecturas = [...f.od.lecturas]
@@ -32,8 +33,13 @@ export function ODTab({ s }) {
       ayuda: k ? `OD leída en la dilución 10⁻${k} (la misma que se sembró en esa columna de Datos)` : 'OD de la suspensión sin diluir',
       get: (f) => f.od.lecturas[k] ?? '', set: setLectura(k),
       clase: (f) => {
-        const v = Number(String(f.od.lecturas[k] ?? '').replace(',', '.'))
-        return String(f.od.lecturas[k] ?? '').trim() !== '' && !finito(v) ? 'mal' : ''
+        const t = String(f.od.lecturas[k] ?? '').trim()
+        if (t === '') return ''
+        const v = Number(t.replace(',', '.'))
+        if (!finito(v)) return 'mal'
+        const neta = odDeFila(f, o).porDil.find((x) => x.k === k)?.od
+        const oc = odCorregida(f, o)
+        return oc.dils.includes(k) ? (oc.fuera ? 'od-fuera' : 'usada') : finito(neta) && (neta < lin[0] || neta > lin[1]) ? 'od-fuera-ventana' : ''
       },
     })),
     ...(o.blancoCorregido ? [] : [{
@@ -52,11 +58,15 @@ export function ODTab({ s }) {
   const leer = async (file) => { try { await importarArchivo(file, s, 'agregar') } catch (e) { s.avisar(e.message, 'error') } }
 
   const colores = paletaMuestras(s.corr.muestras)
-  // en el tiempo se grafica la OD sin diluir (la del cultivo)
-  const valores = s.corr.ind.filter((p) => p.k === 0 && finito(p.x)).map((p) => ({ id: p.id, muestra: p.muestra, t: p.t, etiqueta: p.etiqueta, y: p.x, valido: true,
-    titulo: `${p.etiqueta} réplica ${p.rep}: OD ${p.x.toFixed(3)}` }))
-  const medias = s.corr.prom.filter((p) => p.k === 0 && p.nOD).map((p) => ({ muestra: p.muestra, t: p.t, etiqueta: p.etiqueta, y: p.x, err: p.nOD > 1 ? [p.x - p.xde, p.x + p.xde] : null }))
-  const lin = linealidadOD(filas, o)
+  // en el tiempo se grafica la OD corregida (la de la muestra sin diluir)
+  const valores = filas.filter(filaEnUso).map((f) => {
+    const oc = odCorregida(f, o)
+    if (!finito(oc.od)) return null
+    const et = etiquetaGrupo(f.muestra, f.tiempo, u)
+    return { id: f.id, muestra: f.muestra, t: tNum(f.tiempo), etiqueta: et, y: oc.od, valido: !oc.fuera, titulo: `${et} réplica ${f.rep}: OD corregida ${oc.od.toFixed(3)}` }
+  }).filter(Boolean)
+  const medias = resumenPorTiempo(filas, o, s.curva).filter((p) => p.nOD).map((p) => ({ muestra: p.muestra, t: p.t, etiqueta: p.etiqueta, y: p.od, err: p.nOD > 1 ? [p.od - p.odDe, p.od + p.odDe] : null }))
+  const linOD = linealidadOD(filas, o)
 
   return (
     <div className="pagina" style={{ maxWidth: 'none' }}>
@@ -78,6 +88,13 @@ export function ODTab({ s }) {
             <Select value={o.equipo} onChange={(v) => s.setOpt('equipo', v)}
               opciones={[['cubeta', 'Espectrofotómetro, cubeta de 1 cm'], ['placa', 'Lector de microplacas'], ['otro', 'Otro']]} />
           </Campo>
+          <Campo label="Ventana lineal del equipo (OD)">
+            <div className="fila-ctrl" style={{ margin: 0, flexWrap: 'nowrap' }}>
+              <input style={{ width: 70 }} value={o.odLinMin} onChange={(e) => s.setOpt('odLinMin', e.target.value)} />
+              <span>a</span>
+              <input style={{ width: 70 }} value={o.odLinMax} onChange={(e) => s.setOpt('odLinMax', e.target.value)} />
+            </div>
+          </Campo>
           <div style={{ alignSelf: 'center' }}>
             <Check label="Lecturas ya corregidas por el blanco (blanco = 0)" checked={o.blancoCorregido} onChange={(v) => s.setOpt('blancoCorregido', v)}
               ayuda="El equipo ya da la OD con el blanco restado: se ocultan las columnas de blanco" />
@@ -92,14 +109,15 @@ export function ODTab({ s }) {
           Las filas son las mismas que en Datos (muestra, tiempo y réplica) y las columnas son las mismas diluciones: en cada una va la OD leída en esa dilución de la serie
           (vacío = no se leyó). Cada lectura es un punto de la curva: su UFC/mL es la de la muestra ÷ 10ᵏ.
           {o.blancoCorregido ? '' : ' OD neta = lectura − blanco (el de la fila o, si está vacío, el general).'}
-          {' '}Como cada dilución es 1:10, la OD debería bajar 10 veces por columna: el cociente se muestra a la derecha y sirve para ver hasta qué OD el equipo es lineal.
+          {' '}<b>OD corregida</b> = las lecturas que caen en la ventana lineal ({lin[0]}–{lin[1]}), multiplicadas por su dilución (OD × 10ᵏ) y promediadas: es la OD de la muestra sin diluir
+          (en verde las lecturas usadas; en amarillo las que quedan fuera de la ventana). Como cada dilución es 1:10, la OD debería bajar 10 veces por columna: el cociente de la derecha muestra hasta qué OD el equipo es lineal y sirve para ajustar la ventana.
           {o.equipo === 'placa' && ' En lector de microplacas el camino óptico depende del volumen del pocillo: usá siempre el mismo volumen y no mezcles la curva con lecturas de cubeta.'}
         </p>
 
         <Grilla s={s} columnas={columnas}
           cabExtra={<><button className="mas" title="Agregar otra lectura" onClick={agregarLectura}>+</button>{' '}
             <button className="mini" title="Quitar la última lectura" onClick={quitarLectura} disabled={M <= 1}>−</button></>}
-          cabResultados={['OD ÷ OD siguiente (esperado 10)', 'Origen de la OD (por muestra)', 'UFC/mL']}
+          cabResultados={['OD corregida', 'OD ÷ OD siguiente (esperado 10)', 'Origen de la OD (por muestra)', 'UFC/mL']}
           resultados={(f) => {
             const d = odDeFila(f, o)
             const rc = calcularFila(f, o)
@@ -109,7 +127,11 @@ export function ODTab({ s }) {
               if (b.k === a.k + 1 && a.od > 0 && b.od > 0) coc.push(a.od / b.od)
             }
             const altos = d.porDil.filter((x) => x.od > 1).length
+            const oc = odCorregida(f, o)
             return <>
+              <td className="res" title={oc.dils.length ? `Lecturas usadas: ${oc.dils.map(etiquetaK).join(', ')}${oc.fuera ? ' (ninguna dentro de la ventana: se usó la más cercana)' : ''}` : ''}>
+                {finito(oc.od) ? <b style={oc.fuera ? { color: '#8a5a00' } : {}}>{oc.od < 10 ? oc.od.toFixed(3) : oc.od.toFixed(1)}{oc.fuera ? ' ⚠' : ''}</b> : '–'}
+              </td>
               <td className="res" title="Cociente entre la OD de una dilución y la de la siguiente. En el rango lineal es ≈ 10; menor indica saturación o lecturas cerca del límite de detección.">
                 {coc.length ? coc.map((x, i) => <span key={i} style={{ color: x < 8 || x > 12.5 ? '#8e2a1c' : undefined, fontWeight: x < 8 || x > 12.5 ? 650 : undefined }}>{i ? ' · ' : ''}×{x.toFixed(1)}</span>) : '–'}
                 {altos > 0 && <span style={{ color: '#8e2a1c' }} title="OD > 1: probablemente fuera del rango lineal"> ⚠</span>}
@@ -133,9 +155,9 @@ export function ODTab({ s }) {
         <div className="rejilla-2">
           <section className="tarjeta">
             <h2>OD por muestra, tiempo y dilución</h2>
-            {lin.nFilas > 0 && (
-              <p className={lin.factor >= 8.5 && lin.factor <= 11.5 ? 'nota' : 'aviso-sel'} style={{ marginTop: 0 }}>
-                Linealidad: la OD baja en promedio <b>×{lin.factor.toFixed(1)}</b> por dilución (esperado ×10; {lin.nFilas} {lin.nFilas === 1 ? 'serie' : 'series'} con 2 o más lecturas &gt; 0,02).
+            {linOD.nFilas > 0 && (
+              <p className={linOD.factor >= 8.5 && linOD.factor <= 11.5 ? 'nota' : 'aviso-sel'} style={{ marginTop: 0 }}>
+                Linealidad: la OD baja en promedio <b>×{linOD.factor.toFixed(1)}</b> por dilución (esperado ×10; {linOD.nFilas} {linOD.nFilas === 1 ? 'serie' : 'series'} con 2 o más lecturas &gt; 0,02).
               </p>
             )}
             <div className="tabla-scroll">
@@ -159,8 +181,8 @@ export function ODTab({ s }) {
             </div>
           </section>
           <section className="tarjeta">
-            <h2>OD sin diluir {medias.some((m) => finito(m.t)) ? 'en el tiempo' : 'por muestra'}</h2>
-            <GraficoTiempo s={s} valores={valores} medias={medias} colores={colores} ejeY={`OD a ${ondaDe(o)} nm`} log={false} estilo={s.estilos.odTiempo} nombre="odTiempo" />
+            <h2>OD corregida {medias.some((m) => finito(m.t)) ? 'en el tiempo' : 'por muestra'}</h2>
+            <GraficoTiempo s={s} valores={valores} medias={medias} colores={colores} ejeY={`OD corregida (${ondaDe(o)} nm)`} log={false} estilo={s.estilos.odTiempo} nombre="odTiempo" />
           </section>
         </div>
       )}

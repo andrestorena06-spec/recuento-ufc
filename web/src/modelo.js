@@ -7,12 +7,27 @@ export const optsDef = () => ({
   // recuento
   rango: '30-300', min: 30, max: 300, metodo: 'ponderada', volDef: 100, volFijo: true, incluirEstimados: false,
   unidadTiempo: 'h', nombres: [],
-  // OD
+  // OD: ventana lineal del fotómetro para elegir las lecturas que forman la OD corregida
   onda: '600', ondaOtra: '', equipo: 'cubeta', blancoOD: '', blancoCorregido: false, origenOD: {},
-  // curva
-  modo: 'individual', modelo: 'lineal', ponderacion: 'relativa', escalaY: 'log', escalaX: 'lin',
-  bandaC: true, bandaP: true, odMin: '', odMax: '', excluidos: [], colorPor: 'muestra',
+  odLinMin: 0.1, odLinMax: 0.8,
+  // curva: puntos 'corregida' (OD corregida de cada réplica) o 'dilucion' (cada lectura con su dilución)
+  puntos: 'corregida', modo: 'individual', modelo: 'semilog', ponderacion: 'relativa', escalaY: 'log10', escalaX: 'lin',
+  bandaC: true, bandaP: true, odMin: '', odMax: '', tMin: '', tMax: '', excluidos: [], colorPor: 'muestra', mostrarEcuacion: true,
+  // condiciones del experimento (aparecen en las exportaciones y, si se elige, al pie de los gráficos)
+  condiciones: { cepa: '', medio: '', temperatura: '', fecha: '', notas: '' }, notaCondiciones: false,
 })
+
+// Eje de UFC/mL según la opción elegida: log₁₀ numérico (2…9, como en los papers), log con 10ⁿ o lineal
+export const ejeUFC = (o, titulo = 'UFC/mL') => (o.escalaY === 'lin' ? { titulo, cero: true }
+  : o.escalaY === 'log' ? { titulo, log: true } : { titulo: `log₁₀ ${titulo}`, exp: true })
+export const OPCIONES_EJE_UFC = [['log10', 'log₁₀ UFC/mL (2…9)'], ['log', 'Logarítmico (10ⁿ)'], ['lin', 'Lineal']]
+
+// Texto de condiciones para el pie de los gráficos
+export function textoCondiciones(o) {
+  const c = o.condiciones || {}
+  const onda = o.onda === 'otra' ? o.ondaOtra : o.onda
+  return [c.cepa, c.medio, c.temperatura && `${c.temperatura} °C`, onda && `OD${onda}`, c.fecha].filter((x) => String(x ?? '').trim()).join(' · ')
+}
 
 export const UNIDADES_T = [['min', 'minutos'], ['h', 'horas'], ['d', 'días']]
 

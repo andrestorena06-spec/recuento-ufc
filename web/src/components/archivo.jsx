@@ -1,8 +1,11 @@
 import { useRef } from 'react'
 import { plantilla } from '../excel.js'
+import { Campo, Check } from './ui.jsx'
+import { textoCondiciones } from '../modelo.js'
 import { descargarBlob } from '../utils.js'
 
 export function ArchivoTab({ s }) {
+  const c = s.opts.condiciones || {}
   const ref = useRef()
   const guardar = () => descargarBlob(new Blob([JSON.stringify(s.exportarSesion())], { type: 'application/json' }), 'sesion_recuento_ufc.json')
   const cargar = async (file) => {
@@ -16,9 +19,10 @@ export function ArchivoTab({ s }) {
         <p className="ayuda aviso-privacidad">Todo se calcula en tu navegador: los datos no se envían a ningún servidor. El trabajo se guarda solo en este navegador; para pasarlo a otra computadora usá «Guardar sesión».</p>
         <ol>
           <li><b>Datos</b>: una fila por réplica (muestra, tiempo y réplica) con las colonias contadas en cada dilución. Se puede cargar un Excel o pegar una tabla.</li>
-          <li><b>OD</b>: la longitud de onda y la OD de cada réplica, y si la OD es de la misma suspensión sembrada o de un cultivo paralelo.</li>
+          <li><b>OD</b>: la OD leída en cada dilución (sin diluir, −1, −2…); el programa arma la OD corregida con las lecturas que caen en el rango lineal.</li>
+          <li><b>Crecimiento</b>: OD y log₁₀ UFC/mL en el tiempo (doble eje), fase exponencial, µ, tiempo de generación y latencia.</li>
           <li><b>Tabla</b>: la correspondencia UFC/mL ↔ OD, por réplica o promediada.</li>
-          <li><b>Curva</b>: ajuste de modelos, comparación, residuos y calculadora OD → UFC/mL.</li>
+          <li><b>Curva</b>: correlación OD ↔ log₁₀ UFC/mL con ecuación y R², comparación de modelos, residuos y calculadora.</li>
           <li><b>Método</b>: cómo se hace cada cálculo y por qué.</li>
         </ol>
       </section>
@@ -33,6 +37,21 @@ export function ArchivoTab({ s }) {
           </div>
           <hr />
           <button className="peligro" onClick={() => window.confirm('¿Empezar un trabajo nuevo? Se borran los datos actuales de este navegador.') && s.nuevo()}>Empezar de cero</button>
+        </section>
+        <section className="tarjeta">
+          <h2>Condiciones del experimento</h2>
+          <p className="ayuda" style={{ marginTop: 0 }}>Una curva de calibración solo vale para estas condiciones. Se agregan como hoja «Condiciones» en todos los Excel descargados.</p>
+          <div className="fila-ctrl">
+            {[['cepa', 'Cepa', 'L100A1'], ['medio', 'Medio de cultivo', 'BHI'], ['temperatura', 'Temperatura (°C)', '37'], ['fecha', 'Fecha', '']].map(([k, t, ph]) => (
+              <Campo key={k} label={t}>
+                <input type={k === 'fecha' ? 'date' : 'text'} style={{ width: k === 'temperatura' ? 90 : 150 }} placeholder={ph} value={c[k] || ''}
+                  onChange={(e) => s.setOpt('condiciones', { ...c, [k]: e.target.value })} />
+              </Campo>
+            ))}
+          </div>
+          <Campo label="Notas"><input value={c.notas || ''} placeholder="Agitación, inóculo, fase…" onChange={(e) => s.setOpt('condiciones', { ...c, notas: e.target.value })} /></Campo>
+          <Check label="Mostrar las condiciones al pie de los gráficos" checked={s.opts.notaCondiciones} onChange={(v) => s.setOpt('notaCondiciones', v)}
+            ayuda={textoCondiciones(s.opts) || 'Completá algún dato para verlo'} />
         </section>
         <section className="tarjeta">
           <h2>Nombres de muestra guardados</h2>

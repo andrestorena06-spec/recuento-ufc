@@ -3,10 +3,10 @@ import { Campo, Check, Modal, Select } from './ui.jsx'
 import { PanelGrafico } from './panelGrafico.jsx'
 import { Grilla, columnasBase } from './grilla.jsx'
 import { importarArchivo } from './importar.js'
-import { claveGrupo, etiquetaGrupo, filaEnUso, filaVacia, tNorm, tNum, UNIDADES_T } from '../modelo.js'
+import { claveGrupo, ejeUFC, etiquetaGrupo, filaEnUso, filaVacia, OPCIONES_EJE_UFC, tNorm, tNum, UNIDADES_T } from '../modelo.js'
 import { calcularFila, cient, ESTADOS, INCONTABLE, leerConteo, METODOS_UFC, RANGOS, rangoDe, sup, textoResultado, esValor, nombreRep } from '../ufc.js'
 import { resumen, finito } from '../estadistica.js'
-import { excelDe, plantilla } from '../excel.js'
+import { excelDe, hojaCondiciones, plantilla } from '../excel.js'
 import { descargarBlob, paletaMuestras } from '../utils.js'
 
 export const etiquetaDil = (k) => (k === 0 ? 'Sin diluir' : `−${k}`)
@@ -30,6 +30,9 @@ export function resumenGrupos(filas, o) {
       censurados: rs.filter((r) => ESTADOS[r.estado][1] === 'cens').length,
       estimados: rs.filter((r) => ESTADOS[r.estado][1] === 'est').length,
     }
+  }).sort((a, b) => {
+    const ma = enUso.findIndex((f) => f.muestra === a.muestra), mb = enUso.findIndex((f) => f.muestra === b.muestra)
+    return ma !== mb ? ma - mb : (finito(a.t) ? a.t : Infinity) - (finito(b.t) ? b.t : Infinity)
   })
 }
 
@@ -117,7 +120,7 @@ export function DatosTab({ s }) {
     const colsM = ['Muestra', tCol, 'Réplicas', 'n con valor', 'Media log10 UFC/mL', 'DE log10', 'Media geométrica UFC/mL', 'IC95 inf', 'IC95 sup', 'Media aritmética UFC/mL', 'CV %']
     const filasM = resumenG.map((m) => ({ Muestra: m.muestra, [tCol]: finito(m.t) ? m.t : m.tiempo, Réplicas: m.nRep, 'n con valor': m.n, 'Media log10 UFC/mL': m.logMedia, 'DE log10': m.logDe,
       'Media geométrica UFC/mL': m.geo, 'IC95 inf': m.icGeo[0], 'IC95 sup': m.icGeo[1], 'Media aritmética UFC/mL': m.aritm, 'CV %': m.cv }))
-    excelDe([{ nombre: 'Recuentos', columnas: cols, filas: datos }, { nombre: 'Por muestra y tiempo', columnas: colsM, filas: filasM }])
+    excelDe([{ nombre: 'Recuentos', columnas: cols, filas: datos }, { nombre: 'Por muestra y tiempo', columnas: colsM, filas: filasM }, hojaCondiciones(o)])
       .then((b) => descargarBlob(b, 'recuento_ufc.xlsx'))
   }
 
@@ -218,7 +221,7 @@ export function DatosTab({ s }) {
             <p className="nota">Las UFC se promedian en escala logarítmica (media geométrica), como es habitual en microbiología: los recuentos tienen distribución aproximadamente log-normal. Una diferencia de 0,3 log₁₀ equivale a un factor 2.</p>
           </section>
           <section className="tarjeta">
-            <h2>UFC/mL {resumenG.some((m) => finito(m.t)) ? 'en el tiempo' : 'por muestra'}</h2>
+            <h2>UFC/mL</h2>
             <GraficoUFC s={s} resumenG={resumenG} colores={colores} />
           </section>
         </div>
@@ -241,7 +244,7 @@ export function DatosTab({ s }) {
 
 // Gráfico compartido para UFC/mL u OD: en función del tiempo si hay tiempos numéricos, si no por grupo.
 // valores: [{ id, muestra, t, etiqueta, y, valido, titulo }] (réplicas) y medias: [{ muestra, t, etiqueta, y, err }]
-export function GraficoTiempo({ s, valores, medias, colores, ejeY, log, estilo, nombre }) {
+export function GraficoTiempo({ s, valores, medias, colores, ejeY, log, eje = null, estilo, nombre }) {
   const u = s.opts.unidadTiempo || 'h'
   const todos = [...medias, ...valores]
   const conTiempo = todos.some((m) => finito(m.t))
@@ -258,7 +261,7 @@ export function GraficoTiempo({ s, valores, medias, colores, ejeY, log, estilo, 
   return (
     <PanelGrafico estilo={estilo} setEstilo={s.setEstilo(nombre)} nombre={nombre} alto={330}
       puntos={puntos} curvas={curvas}
-      ejeX={conTiempo ? { titulo: `Tiempo (${u})`, cero: true } : { titulo: 'Muestra', categorias: cats }} ejeY={{ titulo: ejeY, log, cero: !log }}
+      ejeX={conTiempo ? { titulo: `Tiempo (${u})`, cero: true } : { titulo: 'Muestra', categorias: cats }} ejeY={eje || { titulo: ejeY, log, cero: !log }} nota={s.nota}
       leyenda={Object.keys(colores).slice(0, 12).map((m) => ({ texto: m || '(sin nombre)', color: colores[m] }))} />
   )
 }
@@ -272,7 +275,29 @@ function GraficoUFC({ s, resumenG, colores }) {
   }).filter(Boolean)
   const medias = resumenG.filter((m) => m.n).map((m) => ({ muestra: m.muestra, t: m.t, etiqueta: m.etiqueta, y: m.geo,
     err: m.n > 1 ? [10 ** (m.logMedia - m.logDe), 10 ** (m.logMedia + m.logDe)] : null }))
-  return <GraficoTiempo s={s} valores={valores} medias={medias} colores={colores} ejeY="UFC/mL" log estilo={s.estilos.muestras} nombre="muestras" />
+  const [vista, setVista] = useState('tiempo')
+  const tiempos = [...new Set(resumenG.map((m) => m.tiempo))].sort((a, b) => (Number(a) - Number(b)) || String(a).localeCompare(String(b)))
+  const [tBar, setTBar] = useState(null)
+  const tSel = tiempos.includes(tBar) ? tBar : tiempos[tiempos.length - 1]
+  const u = s.opts.unidadTiempo || 'h'
+  return (
+    <>
+      <div className="fila-ctrl" style={{ marginTop: 0 }}>
+        <div className="seg">
+          <button className={vista === 'tiempo' ? 'on' : ''} onClick={() => setVista('tiempo')}>{resumenG.some((m) => finito(m.t)) ? 'En el tiempo' : 'Puntos'}</button>
+          <button className={vista === 'barras' ? 'on' : ''} onClick={() => setVista('barras')}>Barras</button>
+        </div>
+        {vista === 'barras' && tiempos.length > 1 && (
+          <Campo label="Tiempo"><Select value={tSel} onChange={setTBar} opciones={tiempos.map((t) => [t, t === '' ? '(sin tiempo)' : `${t} ${u}`])} /></Campo>
+        )}
+        <Campo label="Eje Y"><Select value={s.opts.escalaY} onChange={(v) => s.setOpt('escalaY', v)} opciones={OPCIONES_EJE_UFC} /></Campo>
+      </div>
+      {vista === 'tiempo'
+        ? <GraficoTiempo s={s} valores={valores} medias={medias} colores={colores} eje={ejeUFC(s.opts)} estilo={s.estilos.muestras} nombre="muestras" />
+        : <BarrasUFC s={s} resumenG={resumenG.filter((m) => m.tiempo === tSel)} valores={valores.filter((v) => tNorm(s.filas.find((f) => f.id === v.id)?.tiempo) === tSel)} colores={colores}
+            titulo={tSel === '' ? '' : `${tSel} ${u}`} />}
+    </>
+  )
 }
 
 // Recuento observado en cada dilución frente al esperado con la estimación (diagnóstico de la serie)
@@ -301,5 +326,26 @@ function SerieDiluciones({ s, f, r }) {
           { texto: `Rango ${L}–${U}`, color: '#2f9e44', banda: true, opacidad: 0.15 }, { texto: 'Esperado', color: '#3a2a1e', linea: true, dash: '5 4' }]} />
       {ceros.length > 0 && <p className="nota">Placas con 0 colonias (no se ven en escala log): {ceros.join(', ')}. Las incontables se dibujan arriba del rango.</p>}
     </section>
+  )
+}
+
+// Barras: media geométrica (log₁₀ ± DE) de cada muestra en un tiempo, con las réplicas encima
+function BarrasUFC({ s, resumenG, valores, colores, titulo }) {
+  const cats = resumenG.map((m) => m.muestra || '(sin nombre)')
+  const puntos = [
+    ...resumenG.map((m, i) => (m.n ? { key: 'b' + i, x: i, y: m.geo, barra: true, color: colores[m.muestra],
+      yErr: m.n > 1 ? [10 ** (m.logMedia - m.logDe), 10 ** (m.logMedia + m.logDe)] : null,
+      titulo: `${m.muestra}: log₁₀ = ${m.logMedia.toFixed(2)}${m.n > 1 ? ' ± ' + m.logDe.toFixed(2) : ''} (n = ${m.n})` } : null)).filter(Boolean),
+    ...valores.map((v) => {
+      const i = resumenG.findIndex((m) => m.muestra === v.muestra)
+      const reps = valores.filter((x) => x.muestra === v.muestra)
+      const j = reps.indexOf(v)
+      return i < 0 ? null : { key: v.id, x: i - 0.15 + (reps.length > 1 ? (0.3 * j) / (reps.length - 1) : 0.15), y: v.y, color: '#3a2a1e', r: 3, hueco: !v.valido, titulo: v.titulo }
+    }).filter(Boolean),
+  ]
+  return (
+    <PanelGrafico estilo={s.estilos.barras} setEstilo={s.setEstilo('barras')} nombre={`barras_${titulo || 'ufc'}`} alto={330} nota={s.nota}
+      puntos={puntos} ejeX={{ titulo: titulo ? `Muestra (${titulo})` : 'Muestra', categorias: cats }} ejeY={ejeUFC(s.opts)}
+      leyenda={[{ texto: 'Media ± DE (log₁₀)', color: '#d9731f', banda: true, opacidad: 0.5 }, { texto: 'Réplica', color: '#3a2a1e' }]} />
   )
 }
