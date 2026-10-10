@@ -30,9 +30,8 @@ export function fusionar(leidas, s, modo = 'agregar') {
     if (x.vol !== undefined) f.vol = x.vol
     x.conteos?.forEach((v, k) => { if (v !== undefined) f.conteos[k] = v })
     if (x.od) {
-      x.od.lecturas?.forEach((v, k) => { f.od.lecturas[k] = v })
+      x.od.lecturas?.forEach((v, k) => { if (v !== undefined) f.od.lecturas[k] = v })
       if (x.od.blanco !== undefined) f.od.blanco = x.od.blanco
-      if (x.od.dil !== undefined) f.od.dil = x.od.dil
     }
     filas[i] = f
     if (x.origen) origen[x.muestra] = x.origen

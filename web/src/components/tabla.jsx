@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { datosCurva, motivoSinPunto } from '../calibracion.js'
+import { datosCurva, etiquetaK, motivoSinPunto } from '../calibracion.js'
 import { cient, ESTADOS } from '../ufc.js'
 import { finito } from '../estadistica.js'
 import { excelDe } from '../excel.js'
@@ -33,8 +33,8 @@ export function TablaTab({ s }) {
       return c.prom.map((p) => {
         const k = enCurva.get(p.id)
         return {
-          Muestra: p.muestra, [`Tiempo (${u})`]: tv(p), 'n OD': p.nOD, [`OD${onda} media`]: r4(p.x), 'DE OD': r4(p.xde),
-          'n UFC': p.nUFC, 'UFC/mL (media geométrica)': r3s(p.y), 'log10 UFC/mL': r4(p.logMedia, 3), 'DE log10': r4(p.logDe, 3),
+          Muestra: p.muestra, [`Tiempo (${u})`]: tv(p), 'Dilución OD': etiquetaK(p.k), 'n OD': p.nOD, [`OD${onda} media`]: r4(p.x), 'DE OD': r4(p.xde),
+          'n UFC': p.nUFC, 'UFC/mL de la dilución (media geométrica)': r3s(p.y), 'log10 UFC/mL': r4(p.logMedia, 3), 'DE log10': r4(p.logDe, 3),
           'IC95 inf': r3s(10 ** (p.logMedia - p.logIc)), 'IC95 sup': r3s(10 ** (p.logMedia + p.logIc)),
           'UFC/mL (media aritmética)': r3s(p.yAritm), 'UFC/mL por unidad de OD': r3s(p.y / p.x),
           'Origen OD': p.origen === 'paralelo' ? 'Cultivo paralelo' : 'Misma suspensión',
@@ -43,14 +43,14 @@ export function TablaTab({ s }) {
       })
     }
     return c.ind.map((p) => {
-      const k = enCurva.get('i:' + p.id) || (p.origen === 'paralelo' ? enCurva.get('g:' + p.grupo) : null)
+      const k = enCurva.get('i:' + p.id) || (p.origen === 'paralelo' ? enCurva.get('g:' + p.grupo + ':' + p.k) : null)
       const sin = motivoSinPunto(p, o)
       const enC = p.origen === 'paralelo'
         ? (k ? (k.usado ? 'Sí, como promedio de la muestra' : 'No: ' + k.motivo) : 'No: ' + (sin || 'sin promedio'))
         : sin ? 'No: ' + sin : k ? (k.usado ? 'Sí' : 'No: ' + k.motivo) : 'No'
       return {
-        Muestra: p.muestra, [`Tiempo (${u})`]: tv(p), Réplica: p.rep, [`OD${onda} neta`]: r4(p.x), 'Lecturas OD': p.d.n, 'Dil. lectura OD': p.d.Fod,
-        'UFC/mL (suspensión leída)': r3s(p.y), 'IC95 inf': r3s(p.ic[0]), 'IC95 sup': r3s(p.ic[1]), 'log10 UFC/mL': r4(Math.log10(p.y), 3),
+        Muestra: p.muestra, [`Tiempo (${u})`]: tv(p), Réplica: p.rep, 'Dilución OD': etiquetaK(p.k), [`OD${onda} neta`]: r4(p.x),
+        'UFC/mL de la dilución': r3s(p.y), 'IC95 inf': r3s(p.ic[0]), 'IC95 sup': r3s(p.ic[1]), 'log10 UFC/mL': r4(Math.log10(p.y), 3),
         'UFC/mL de la muestra': r3s(p.r.Nmadre), 'UFC/mL por unidad de OD': r3s(p.y / p.x), 'Recuento': ESTADOS[p.r.estado][0],
         'Diluciones usadas': p.r.dils.map((k) => (k ? '-' + k : '0')).join(', '),
         'Origen OD': p.origen === 'paralelo' ? 'Cultivo paralelo' : 'Misma suspensión', 'En la curva': enC,
@@ -93,9 +93,9 @@ export function TablaTab({ s }) {
           </div>
         </div>
         <p className="ayuda" style={{ marginTop: 0 }}>
-          La UFC/mL que se compara con cada OD es la de <b>la suspensión cuya OD se leyó</b>: UFC/mL de la muestra (recuento × 10ᵏ / volumen) ÷ factor de dilución de la lectura de OD (1 si la OD se leyó sin diluir). {o.modo === 'promedio'
-            ? 'En modo promedio la OD es la media aritmética y la UFC/mL la media geométrica de las réplicas válidas.'
-            : 'En modo individual cada réplica es un punto; las muestras con OD de cultivo paralelo entran con sus promedios.'}
+          Cada lectura de OD se compara con la UFC/mL <b>de esa misma dilución</b>: UFC/mL de la muestra (recuento × 10ᵏ / volumen) ÷ 10ᵏ de la dilución leída. {o.modo === 'promedio'
+            ? 'En modo promedio, para cada muestra, tiempo y dilución, la OD es la media aritmética y la UFC/mL la media geométrica de las réplicas válidas.'
+            : 'En modo individual cada lectura (réplica y dilución) es un punto; las muestras con OD de cultivo paralelo entran con sus promedios.'}
         </p>
         {!filas.length ? <div className="vacio">Sin datos: cargá recuentos en Datos y lecturas en OD.</div> : (
           <div className="tabla-scroll" style={{ maxHeight: 560 }}>

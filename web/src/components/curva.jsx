@@ -3,7 +3,7 @@ import { Campo, Check, Select } from './ui.jsx'
 import { PanelGrafico } from './panelGrafico.jsx'
 import { ModoSel } from './tabla.jsx'
 import { ondaDe } from './od.jsx'
-import { ajustar, datosCurva, interpretar, MODELOS, odParaUFC } from '../calibracion.js'
+import { ajustar, datosCurva, etiquetaK, interpretar, linealidadOD, MODELOS, odParaUFC } from '../calibracion.js'
 import { cient, fmtP, leerFactor } from '../ufc.js'
 import { finito } from '../estadistica.js'
 import { paletaMuestras } from '../utils.js'
@@ -23,10 +23,14 @@ export function CurvaTab({ s }) {
   const u = o.unidadTiempo || 'h'
   const tiempos = [...new Set(s.corr.ind.map((p) => p.tiempo))].sort((a, b) => (Number(a) - Number(b)) || String(a).localeCompare(String(b)))
   const porTiempo = o.colorPor === 'tiempo'
+  const porDil = o.colorPor === 'dilucion'
+  const dils = [...new Set(s.corr.ind.map((p) => p.k).filter((k) => k !== null))].sort((a, b) => a - b)
+  const colD = paletaMuestras(dils.map(String))
   const colM = paletaMuestras(s.corr.muestras)
   const colT = paletaMuestras(tiempos)
-  const colorDe = (p) => (porTiempo ? colT[p.tiempo] : colM[p.muestra])
-  const nombreDe = (p) => (p.tipo === 'promedio' ? `${p.etiqueta} (promedio)` : `${p.etiqueta}, réplica ${p.rep}`)
+  const colorDe = (p) => (porTiempo ? colT[p.tiempo] : porDil ? colD[String(p.k)] : colM[p.muestra])
+  const nombreDe = (p) => (p.tipo === 'promedio' ? `${p.etiqueta}, ${etiquetaK(p.k).toLowerCase()} (promedio)` : `${p.etiqueta}, réplica ${p.rep}, ${etiquetaK(p.k).toLowerCase()}`)
+  const lin = useMemo(() => linealidadOD(s.filas, o), [s.filas, o])
   const [barras, setBarras] = useState(true)
 
   const alternar = (p) => {
@@ -60,7 +64,9 @@ export function CurvaTab({ s }) {
     }
   })
   const leyenda = [
-    ...(porTiempo
+    ...(porDil
+      ? dils.filter((k) => todos.some((p) => p.k === k)).map((k) => ({ texto: etiquetaK(k), color: colD[String(k)] }))
+      : porTiempo
       ? tiempos.filter((t) => todos.some((p) => p.tiempo === t)).slice(0, 14).map((t) => ({ texto: t === '' ? '(sin tiempo)' : `${t} ${u}`, color: colT[t] }))
       : s.corr.muestras.filter((m) => todos.some((p) => p.muestra === m)).slice(0, 14).map((m) => ({ texto: m || '(sin nombre)', color: colM[m] }))),
     ...(ok ? [{ texto: MODELOS[o.modelo].corto, color: '#3a2a1e', linea: true }] : []),
@@ -78,8 +84,8 @@ export function CurvaTab({ s }) {
 
   const exportar = () => {
     const hojas = [{
-      nombre: 'Puntos', columnas: ['Muestra', `Tiempo (${u})`, 'Réplica', 'Tipo', 'OD', 'UFC/mL', 'En el ajuste', 'Motivo', 'UFC/mL ajustado', 'Residuo log10'],
-      filas: todos.map((p) => ({ Muestra: p.muestra, [`Tiempo (${u})`]: Number.isFinite(p.t) ? p.t : p.tiempo, Réplica: p.rep ?? '', Tipo: p.tipo, OD: p.x, 'UFC/mL': p.y, 'En el ajuste': p.usado ? 'Sí' : 'No', Motivo: p.motivo,
+      nombre: 'Puntos', columnas: ['Muestra', `Tiempo (${u})`, 'Réplica', 'Dilución OD', 'Tipo', 'OD', 'UFC/mL', 'En el ajuste', 'Motivo', 'UFC/mL ajustado', 'Residuo log10'],
+      filas: todos.map((p) => ({ Muestra: p.muestra, [`Tiempo (${u})`]: Number.isFinite(p.t) ? p.t : p.tiempo, Réplica: p.rep ?? '', 'Dilución OD': etiquetaK(p.k), Tipo: p.tipo, OD: p.x, 'UFC/mL': p.y, 'En el ajuste': p.usado ? 'Sí' : 'No', Motivo: p.motivo,
         'UFC/mL ajustado': ok ? aj.pred(p.x) : null, 'Residuo log10': ok && aj.pred(p.x) > 0 ? Math.log10(p.y / aj.pred(p.x)) : null })),
     }, {
       nombre: 'Modelos', columnas: ['Modelo', 'Ecuación', 'n', 'R2', 'R2 ajustado', 'RMSE log10', 'AICc', 'Error relativo medio %'],
@@ -114,7 +120,7 @@ export function CurvaTab({ s }) {
           <Campo label="Eje X"><Select value={o.escalaX} onChange={(v) => s.setOpt('escalaX', v)} opciones={[['lin', 'Lineal'], ['log', 'Log']]} /></Campo>
         </div>
         <Campo label="Color de los puntos">
-          <Select value={o.colorPor} onChange={(v) => s.setOpt('colorPor', v)} opciones={[['muestra', 'Por muestra'], ['tiempo', 'Por tiempo']]} />
+          <Select value={o.colorPor} onChange={(v) => s.setOpt('colorPor', v)} opciones={[['muestra', 'Por muestra'], ['tiempo', 'Por tiempo'], ['dilucion', 'Por dilución']]} />
         </Campo>
         <Check label="Banda de confianza 95 % (de la curva)" checked={o.bandaC} onChange={(v) => s.setOpt('bandaC', v)} />
         <Check label="Banda de predicción 95 % (de una medición nueva)" checked={o.bandaP} onChange={(v) => s.setOpt('bandaP', v)} />
@@ -164,7 +170,7 @@ export function CurvaTab({ s }) {
                   Menor AICc = mejor equilibrio entre ajuste y número de parámetros; ΔAICc &lt; 2 se considera equivalente. No elijas solo por el número: mirá también los residuos.</p>
               </section>
             )}
-            {ok && <Interpretacion ajustes={ajustes} aj={aj} usados={usados} />}
+            {ok && <Interpretacion ajustes={ajustes} aj={aj} usados={usados} lin={lin} />}
             {ok && <Residuos s={s} aj={aj} colorDe={colorDe} nombreDe={nombreDe} ejeOD={ejeOD} />}
             {ok && <Calculadora aj={aj} xmin={xmin} xmax={xmax} onda={onda} />}
           </>
@@ -204,8 +210,8 @@ function Resultados({ aj, s }) {
   )
 }
 
-function Interpretacion({ ajustes, aj, usados }) {
-  const items = interpretar(ajustes, aj, usados)
+function Interpretacion({ ajustes, aj, usados, lin }) {
+  const items = interpretar(ajustes, aj, usados, lin)
   return (
     <section style={{ marginTop: 22 }}>
       <h3>Interpretación</h3>

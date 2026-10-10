@@ -63,7 +63,7 @@ export function MetodoTab({ s }) {
         <h3>7. Densidad óptica</h3>
         <p>La OD de una suspensión bacteriana no es absorción sino <b>dispersión de la luz</b> (turbidez). Es proporcional a la concentración de células solo mientras cada fotón se dispersa como máximo una vez: a OD altas ocurre dispersión múltiple y la OD medida crece menos que la concentración (Koch, 1970; Stevenson et al., 2016).</p>
         <ul>
-          <li><b>Rango lineal</b>: típicamente hasta OD 0,3–0,5 y en algunos equipos hasta ~1; depende del espectrofotómetro (geometría óptica), la longitud de onda y el tamaño y forma de las células. Leé las suspensiones densas diluidas (columna <i>Dil. lectura</i>) para quedar dentro del rango.</li>
+          <li><b>Rango lineal</b>: típicamente hasta OD 0,3–0,5 y en algunos equipos hasta ~1; depende del espectrofotómetro (geometría óptica), la longitud de onda y el tamaño y forma de las células. Leyendo la OD en varias diluciones de la serie (pestaña OD) se ve directamente hasta dónde el equipo es lineal: la OD tiene que bajar 10 veces por dilución.</li>
           <li><b>OD muy baja</b> (&lt; 0,05): el error relativo de la lectura es grande.</li>
           <li><b>Blanco</b>: medio de cultivo estéril; la OD neta es lectura − blanco. Si el equipo ya se calibró a cero con el medio, el blanco es 0.</li>
           <li><b>Longitud de onda</b>: 600 nm es la convención para bacterias (poca absorción de los medios y de los pigmentos). Una curva vale solo para la longitud de onda, el equipo y el tipo de cubeta/placa con que se hizo.</li>
@@ -75,7 +75,11 @@ export function MetodoTab({ s }) {
         <p><b>Misma suspensión</b>: cada réplica es un par real (OD, UFC/mL) y entra como un punto en modo individual. <b>Cultivo paralelo</b>: la réplica de OD y la de UFC son cultivos distintos, así que emparejarlas réplica a réplica es arbitrario; en modo individual esas muestras entran con un solo punto (OD media, UFC media geométrica). La variación entre cultivos se suma a la dispersión de la curva.</p>
 
         <h3>9. Correspondencia y curva de calibración</h3>
-        <p>Cada punto es: <code>x = OD neta</code> de la suspensión leída, <code>y = UFC/mL de esa misma suspensión</code> = UFC/mL de la muestra ÷ dilución de la lectura de OD (1 si se leyó sin diluir).
+        <p>En la pestaña OD cada columna es una dilución de la misma serie que se sembró (sin diluir, 10⁻¹, 10⁻²…). Cada lectura es un punto:
+          <code>x = OD neta</code> de la dilución 10⁻ᵏ, <code>y = UFC/mL de esa dilución</code> = UFC/mL de la muestra ÷ 10ᵏ. Así una sola réplica aporta varios puntos que cubren el rango de OD.</p>
+        <p><b>Linealidad del fotómetro.</b> Como la dilución es exacta (1:10), la OD de diluciones sucesivas debería bajar 10 veces. Se estima la pendiente común de <code>log₁₀(OD)</code> frente a k dentro de cada serie (lecturas &gt; 0,02): el factor medio por dilución es <code>10^(−pendiente)</code> y debería ser ≈ 10. Un factor menor indica saturación de las lecturas concentradas (o lecturas diluidas cerca del límite de detección). Este control no depende de los recuentos.</p>
+        <p><b>Independencia.</b> Las diluciones de una misma réplica comparten el recuento (sus UFC/mL son ese recuento ÷ 10ᵏ), así que sus errores están correlacionados: la curva es insesgada, pero los IC de los parámetros son algo optimistas. La banda de predicción y el modo promedio dan una idea más conservadora.</p>
+        <p>
           Se ajusta UFC en función de OD (y no al revés) porque el uso de la curva es predecir UFC a partir de una OD medida, y la OD tiene mucho menos error relativo que el recuento.</p>
         <h4>Modelos</h4>
         <ul>

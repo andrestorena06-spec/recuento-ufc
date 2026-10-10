@@ -1,6 +1,7 @@
 import { nuevoId } from './utils.js'
 
 export const K_DEF = 11 // sin diluir + 10⁻¹ … 10⁻¹⁰
+export const M_DEF = 3 // columnas de OD: sin diluir, 10⁻¹, 10⁻²
 
 export const optsDef = () => ({
   // recuento
@@ -15,9 +16,9 @@ export const optsDef = () => ({
 
 export const UNIDADES_T = [['min', 'minutos'], ['h', 'horas'], ['d', 'días']]
 
-export const filaVacia = (muestra = '', rep = '', K = K_DEF, M = 1) => ({
+export const filaVacia = (muestra = '', rep = '', K = K_DEF, M = M_DEF) => ({
   id: nuevoId(), muestra, tiempo: '', rep, repManual: false, vol: '', conteos: Array(K).fill(''),
-  od: { lecturas: Array(M).fill(''), blanco: '', dil: '' },
+  od: { lecturas: Array(M).fill(''), blanco: '' },
 })
 
 const vacio = (v) => v === null || v === undefined || String(v).trim() === ''

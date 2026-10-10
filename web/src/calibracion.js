@@ -6,45 +6,78 @@ import { finito, media, desvio, mco, varAjuste, tCuantil, shapiroWilk, resumen }
 import { calcularFila, esValor, leerFactor } from './ufc.js'
 import { claveGrupo, etiquetaGrupo, filaEnUso, tNorm, tNum } from './modelo.js'
 
-// OD neta de una fila: media de las lecturas menos el blanco (de la fila o el general).
-// Con «lecturas ya corregidas por el blanco» el blanco es 0.
+// OD de una fila: una lectura por dilución (od.lecturas[k] = OD de la dilución 10⁻ᵏ de la misma serie).
+// OD neta = lectura − blanco (el de la fila o el general); con «lecturas ya corregidas por el blanco» el blanco es 0.
 export function odDeFila(fila, o) {
-  const txt = (fila.od?.lecturas || []).map((v) => String(v ?? '').trim())
-  const lect = txt.filter((v) => v !== '').map((v) => Number(v.replace(',', '.'))).filter(finito)
   let bl = 0
   if (!o.blancoCorregido) bl = String(fila.od?.blanco ?? '').trim() !== '' ? Number(String(fila.od.blanco).replace(',', '.')) : Number(String(o.blancoOD ?? '').replace(',', '.')) || 0
-  const netas = lect.map((v) => v - (finito(bl) ? bl : 0))
-  const Fod = leerFactor(fila.od?.dil)
-  return { n: netas.length, od: netas.length ? media(netas) : NaN, de: netas.length > 1 ? desvio(netas) : NaN, crudas: lect, blanco: bl, Fod }
+  if (!finito(bl)) bl = 0
+  const porDil = []
+  ;(fila.od?.lecturas || []).forEach((v, k) => {
+    const t = String(v ?? '').trim()
+    if (t === '') return
+    const crudo = Number(t.replace(',', '.'))
+    if (finito(crudo)) porDil.push({ k, crudo, od: crudo - bl })
+  })
+  return { porDil, n: porDil.length, blanco: bl }
 }
 
-// Arma la tabla de correspondencia. Cada grupo es una muestra en un tiempo; sus filas son las réplicas.
+// Control de linealidad del fotómetro: en una serie 1:10 la OD debe bajar 10 veces por dilución.
+// Pendiente común de log₁₀(OD) frente a k dentro de cada fila (esperada −1); usa OD > odMin.
+export function linealidadOD(filas, o, odMin = 0.02) {
+  let sxy = 0, sxx = 0, nFilas = 0, nPuntos = 0
+  const cocientes = []
+  filas.filter(filaEnUso).forEach((f) => {
+    const p = odDeFila(f, o).porDil.filter((d) => d.od > odMin)
+    for (let i = 1; i < p.length; i++) if (p[i].k === p[i - 1].k + 1) cocientes.push(p[i - 1].od / p[i].od)
+    if (p.length < 2) return
+    const km = media(p.map((d) => d.k)), zm = media(p.map((d) => Math.log10(d.od)))
+    p.forEach((d) => { sxy += (d.k - km) * (Math.log10(d.od) - zm); sxx += (d.k - km) ** 2 })
+    nFilas++; nPuntos += p.length
+  })
+  const pendiente = sxx > 0 ? sxy / sxx : NaN
+  return { pendiente, factor: 10 ** -pendiente, nFilas, nPuntos, cocientes }
+}
+
+export const etiquetaK = (k) => (k === null || k === undefined ? '–' : k === 0 ? 'Sin diluir' : `−${k}`)
+
+// Arma la tabla de correspondencia. Cada lectura de OD es un punto: x = OD neta de la dilución 10⁻ᵏ,
+// y = UFC/mL de esa dilución = UFC/mL de la muestra / 10ᵏ. Grupo = muestra en un tiempo.
 export function correspondencia(filasTodas, o) {
   const filas = filasTodas.filter(filaEnUso)
   const u = o.unidadTiempo || 'h'
-  const ind = filas.map((f) => {
+  const ind = []
+  filas.forEach((f) => {
     const r = calcularFila(f, o)
     const d = odDeFila(f, o)
-    // UFC/mL en la suspensión cuya OD se leyó = UFC/mL de la muestra / factor de dilución de la lectura
-    const y = r.Nmadre / d.Fod
-    return {
-      id: f.id, muestra: f.muestra, tiempo: tNorm(f.tiempo), t: tNum(f.tiempo), rep: f.rep,
-      grupo: claveGrupo(f.muestra, f.tiempo), etiqueta: etiquetaGrupo(f.muestra, f.tiempo, u),
-      r, d, x: d.od, y, ic: r.icMadre.map((v) => v / d.Fod),
-      valido: esValor(r, o.incluirEstimados) && finito(d.od) && finito(y),
+    const base = {
+      filaId: f.id, muestra: f.muestra, tiempo: tNorm(f.tiempo), t: tNum(f.tiempo), rep: f.rep,
+      grupo: claveGrupo(f.muestra, f.tiempo), etiqueta: etiquetaGrupo(f.muestra, f.tiempo, u), r,
       origen: o.origenOD?.[f.muestra] || 'misma',
     }
+    if (!d.porDil.length) { ind.push({ ...base, id: f.id + ':-', k: null, x: NaN, y: NaN, ic: [NaN, NaN], valido: false }); return }
+    d.porDil.forEach(({ k, od, crudo }) => {
+      const y = r.Nmadre / 10 ** k
+      ind.push({
+        ...base, id: f.id + ':' + k, k, x: od, crudo, y, ic: r.icMadre.map((v) => v / 10 ** k),
+        valido: esValor(r, o.incluirEstimados) && finito(od) && finito(y),
+      })
+    })
   })
   const grupos = [...new Set(ind.map((p) => p.grupo))]
   const muestras = [...new Set(ind.map((p) => p.muestra))]
-  const prom = grupos.map((gk) => {
-    const g = ind.filter((p) => p.grupo === gk)
-    const ok = g.filter((p) => p.valido)
+  // promedios por grupo y dilución
+  const claves = [...new Set(ind.filter((p) => p.k !== null).map((p) => p.grupo + '\u0001' + p.k))]
+  const prom = claves.map((ck) => {
+    const [gk, ks] = ck.split('\u0001')
+    const k = Number(ks)
+    const g = ind.filter((p) => p.grupo === gk && p.k === k)
     // para la OD se usan todas las réplicas con lectura; para las UFC solo las que dan un valor
+    const ok = g.filter((p) => p.valido)
     const rx = resumen(g.map((p) => p.x).filter(finito))
     const ry = resumen(ok.map((p) => Math.log10(p.y)).filter(finito))
     return {
-      id: 'g:' + gk, grupo: gk, muestra: g[0].muestra, tiempo: g[0].tiempo, t: g[0].t, etiqueta: g[0].etiqueta, rep: null,
+      id: 'g:' + gk + ':' + k, grupo: gk, k, muestra: g[0].muestra, tiempo: g[0].tiempo, t: g[0].t, etiqueta: g[0].etiqueta, rep: null,
       nOD: rx.n, nUFC: ry.n, x: rx.media, xde: rx.de,
       logMedia: ry.media, logDe: ry.de, logIc: ry.ic, y: 10 ** ry.media,
       yAritm: ok.length ? media(ok.map((p) => p.y)) : NaN,
@@ -56,7 +89,7 @@ export function correspondencia(filasTodas, o) {
 
 // Puntos que entran en la curva según el modo. En modo individual, las muestras cuya OD viene
 // de un cultivo paralelo (no de la misma suspensión) no se pueden emparejar réplica a réplica:
-// aportan el promedio de cada tiempo.
+// aportan el promedio de cada tiempo y dilución.
 export function puntosCurva(c, modo) {
   if (modo === 'promedio') return c.prom.filter((p) => p.valido).map((p) => ({ ...p, tipo: 'promedio' }))
   const out = []
@@ -64,7 +97,7 @@ export function puntosCurva(c, modo) {
     if (pm.origen === 'paralelo') {
       if (pm.valido) out.push({ ...pm, tipo: 'promedio' })
     } else {
-      c.ind.filter((p) => p.grupo === pm.grupo && p.valido).forEach((p) => out.push({ ...p, tipo: 'individual' }))
+      c.ind.filter((p) => p.grupo === pm.grupo && p.k === pm.k && p.valido).forEach((p) => out.push({ ...p, tipo: 'individual' }))
     }
   })
   return out
@@ -177,8 +210,18 @@ export function odParaUFC(aj, objetivo, maxOD) {
 }
 
 // Interpretación automática del ajuste
-export function interpretar(ajustes, actual, puntos) {
+export function interpretar(ajustes, actual, puntos, lin) {
   const out = []
+  if (lin && lin.nFilas > 0 && finito(lin.pendiente)) {
+    const f = lin.factor
+    out.push(f >= 8.5 && f <= 11.5
+      ? ['ok', `Linealidad del fotómetro: entre diluciones sucesivas la OD baja ×${f.toFixed(1)} en promedio (esperado ×10; ${lin.nFilas} series). La respuesta es lineal en el rango leído.`]
+      : ['aviso', `Linealidad del fotómetro: entre diluciones sucesivas la OD baja ×${f.toFixed(1)} en promedio (esperado ×10; ${lin.nFilas} series). ${f < 8.5 ? 'Baja menos de lo esperado: las lecturas más concentradas están saturadas (fuera del rango lineal) o las más diluidas están cerca del límite de detección.' : 'Baja más de lo esperado: revisá el blanco y las diluciones.'} Conviene limitar la curva al rango de OD en que el cociente es ≈ 10.`])
+  }
+  const reps = new Set(puntos.filter((p) => p.tipo === 'individual').map((p) => p.filaId))
+  if (puntos.filter((p) => p.tipo === 'individual').length > reps.size) {
+    out.push(['aviso', 'Varias diluciones de una misma réplica comparten el mismo recuento (sus UFC/mL son el recuento ÷ 10ᵏ), así que sus errores no son independientes. La curva es correcta, pero los intervalos de confianza resultan algo más estrechos de lo real: para una incertidumbre conservadora mirá la banda de predicción o usá el modo promedio.'])
+  }
   const L = ajustes.lineal, Q = ajustes.cuadratico, P = ajustes.loglog
   if (L?.f) {
     const [lo, hi] = L.f.ic[0]
@@ -234,7 +277,7 @@ export function datosCurva(corr, o) {
 
 // Motivo por el que una fila no da un punto (para la tabla)
 export function motivoSinPunto(p, o) {
-  if (!finito(p.d.od)) return 'Sin OD'
+  if (!finito(p.x)) return 'Sin OD'
   const e = p.r.estado
   if (e === 'vacio') return 'Sin recuento'
   if (e === 'bajoLD' || e === 'sobreLC') return 'Recuento fuera de los límites (< o >)'
