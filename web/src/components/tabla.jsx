@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { datosCurva, motivoSinPunto } from '../calibracion.js'
-import { cient, ESTADOS, nombreRep } from '../ufc.js'
+import { cient, ESTADOS } from '../ufc.js'
 import { finito } from '../estadistica.js'
 import { excelDe } from '../excel.js'
 import { descargarBlob } from '../utils.js'
@@ -22,6 +22,8 @@ export function TablaTab({ s }) {
   const o = s.opts
   const c = s.corr
   const onda = ondaDe(o)
+  const u = o.unidadTiempo || 'h'
+  const tv = (p) => (Number.isFinite(p.t) ? p.t : p.tiempo || null)
   const curva = useMemo(() => datosCurva(c, o), [c, o])
   const enCurva = new Map(curva.todos.map((p) => [p.key, p]))
   const [orden, setOrden] = useState(null)
@@ -29,9 +31,9 @@ export function TablaTab({ s }) {
   const filas = useMemo(() => {
     if (o.modo === 'promedio') {
       return c.prom.map((p) => {
-        const k = enCurva.get('m:' + p.muestra)
+        const k = enCurva.get(p.id)
         return {
-          Muestra: p.muestra, 'n OD': p.nOD, [`OD${onda} media`]: r4(p.x), 'DE OD': r4(p.xde),
+          Muestra: p.muestra, [`Tiempo (${u})`]: tv(p), 'n OD': p.nOD, [`OD${onda} media`]: r4(p.x), 'DE OD': r4(p.xde),
           'n UFC': p.nUFC, 'UFC/mL (media geométrica)': r3s(p.y), 'log10 UFC/mL': r4(p.logMedia, 3), 'DE log10': r4(p.logDe, 3),
           'IC95 inf': r3s(10 ** (p.logMedia - p.logIc)), 'IC95 sup': r3s(10 ** (p.logMedia + p.logIc)),
           'UFC/mL (media aritmética)': r3s(p.yAritm), 'UFC/mL por unidad de OD': r3s(p.y / p.x),
@@ -41,20 +43,20 @@ export function TablaTab({ s }) {
       })
     }
     return c.ind.map((p) => {
-      const k = enCurva.get('i:' + p.id) || (p.origen === 'paralelo' ? enCurva.get('m:' + p.muestra) : null)
+      const k = enCurva.get('i:' + p.id) || (p.origen === 'paralelo' ? enCurva.get('g:' + p.grupo) : null)
       const sin = motivoSinPunto(p, o)
       const enC = p.origen === 'paralelo'
         ? (k ? (k.usado ? 'Sí, como promedio de la muestra' : 'No: ' + k.motivo) : 'No: ' + (sin || 'sin promedio'))
         : sin ? 'No: ' + sin : k ? (k.usado ? 'Sí' : 'No: ' + k.motivo) : 'No'
       return {
-        Muestra: p.muestra, Réplica: p.rep, [`OD${onda} neta`]: r4(p.x), 'Lecturas OD': p.d.n, 'Dil. lectura OD': p.d.Fod,
+        Muestra: p.muestra, [`Tiempo (${u})`]: tv(p), Réplica: p.rep, [`OD${onda} neta`]: r4(p.x), 'Lecturas OD': p.d.n, 'Dil. lectura OD': p.d.Fod,
         'UFC/mL (suspensión leída)': r3s(p.y), 'IC95 inf': r3s(p.ic[0]), 'IC95 sup': r3s(p.ic[1]), 'log10 UFC/mL': r4(Math.log10(p.y), 3),
         'UFC/mL madre': r3s(p.r.Nmadre), 'UFC/mL por unidad de OD': r3s(p.y / p.x), 'Recuento': ESTADOS[p.r.estado][0],
         'Diluciones usadas': p.r.dils.map((k) => (k ? '-' + k : '0')).join(', '),
         'Origen OD': p.origen === 'paralelo' ? 'Cultivo paralelo' : 'Misma suspensión', 'En la curva': enC,
       }
     })
-  }, [c, o, onda])
+  }, [c, o, onda, u])
   const columnas = Object.keys(filas[0] || {})
   const vista = useMemo(() => {
     if (!orden) return filas
@@ -106,7 +108,7 @@ export function TablaTab({ s }) {
               <tbody>
                 {vista.map((f, i) => (
                   <tr key={i} style={String(f['En la curva']).startsWith('No') ? { color: 'var(--suave)' } : {}}>
-                    {columnas.map((col) => <td key={col}>{col === 'Muestra' && f.Réplica ? nombreRep(f.Muestra, f.Réplica) : mostrar(col, f[col])}</td>)}
+                    {columnas.map((col) => <td key={col}>{mostrar(col, f[col])}</td>)}
                   </tr>
                 ))}
               </tbody>

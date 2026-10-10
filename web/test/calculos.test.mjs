@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict'
 import { calcularFila, leerConteo, leerFactor } from '../src/ufc.js'
 import { icPoisson, qchisq } from '../src/estadistica.js'
-import { separarReplica, columnaDilucion } from '../src/excel.js'
+import { separarReplica, columnaDilucion, interpretarTabla } from '../src/excel.js'
+import { numerarReplicas } from '../src/modelo.js'
 
 const o = { rango: '30-300', metodo: 'ponderada', volDef: 100 }
 const cerca = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol * Math.abs(b), `${a} ≠ ${b}`)
@@ -41,4 +42,18 @@ assert.equal(columnaDilucion('10⁻⁴'), 4)
 assert.deepEqual(separarReplica('L100A1₂'), ['L100A1', 2])
 assert.deepEqual(separarReplica('L201'), ['L201', null])
 assert.deepEqual(separarReplica('L100A1 (3)'), ['L100A1', 3])
+// volumen fijo: se ignora el de la fila
+r = calcularFila({ vol: 10, conteos: [100] }, { ...o, volFijo: true, volDef: 100 })
+cerca(r.N, 1000)
+
+// réplicas por muestra y tiempo (vuelven a empezar en cada tiempo; las escritas a mano se respetan)
+const f = (muestra, tiempo, rep = '', repManual = false) => ({ muestra, tiempo, rep, repManual })
+const nr = numerarReplicas([f('L100', 0), f('L100', 0), f('L100', '0,0'), f('L100', 1), f('L100', 1), f('L201', 1), f('L100', 1, 1, true), f('', '')])
+assert.deepEqual(nr.map((x) => x.rep), [1, 2, 3, 2, 3, 1, 1, ''])
+
+// tabla pegada con encabezados: tiempo y réplicas por grupo, solo los campos presentes
+const t = interpretarTabla([['Muestra', 'Tiempo (h)', 'OD'], ['L100', '0', '0.1'], ['L100', '0', '0.12'], ['L100', '2', '0.5']])
+assert.deepEqual(t.filas.map((x) => [x.tiempo, x.rep, x.od.lecturas[0]]), [['0', 1, '0.1'], ['0', 2, '0.12'], ['2', 1, '0.5']])
+assert.equal(t.filas[0].conteos, undefined)
+assert.equal(t.filas[0].od.blanco, undefined)
 console.log('Todas las pruebas pasaron.')

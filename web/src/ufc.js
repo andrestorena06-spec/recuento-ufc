@@ -62,7 +62,7 @@ export const rangoDe = (o) => {
 // Resultado de una fila (una réplica). conteos[k] = colonias en la columna k.
 export function calcularFila(fila, o) {
   const [L, U] = rangoDe(o)
-  const V = (Number(fila.vol) || Number(o.volDef) || 100) / 1000 // mL
+  const V = ((o.volFijo ? NaN : Number(fila.vol)) || Number(o.volDef) || 100) / 1000 // mL
   const F = leerFactor(fila.dprev)
   const placas = (fila.conteos || []).map((c, k) => ({ k, c: leerConteo(c), q: V * 10 ** -k })).filter((p) => p.c !== null)
   const avisos = []

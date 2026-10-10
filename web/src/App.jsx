@@ -6,7 +6,7 @@ import { CurvaTab } from './components/curva.jsx'
 import { MetodoTab } from './components/metodo.jsx'
 import { ArchivoTab } from './components/archivo.jsx'
 import { Modal } from './components/ui.jsx'
-import { K_DEF, optsDef, filaVacia } from './modelo.js'
+import { K_DEF, optsDef, filaVacia, numerarReplicas } from './modelo.js'
 import { correspondencia } from './calibracion.js'
 
 const CLAVE = 'recuento-ufc-v1'
@@ -38,7 +38,9 @@ export default function App() {
   const g = useMemo(cargarGuardado, [])
   const [pendiente, setPendiente] = useState(() => !!(g.filas && g.filas.length))
   const [tab, setTab] = useState('datos')
-  const [filas, setFilas] = useState([])
+  const [filas, setFilasCrudo] = useState([])
+  // toda modificación de filas pasa por acá: las réplicas automáticas se renumeran por muestra y tiempo
+  const setFilas = useCallback((x) => setFilasCrudo((fs) => numerarReplicas(typeof x === 'function' ? x(fs) : x)), [])
   const [K, setK] = useState(K_DEF)
   const [M, setM] = useState(1)
   const [opts, setOpts] = useState(optsDef)
@@ -61,13 +63,13 @@ export default function App() {
     const k = Math.max(Number(x.K) || K_DEF, ...x.filas.map((f) => f.conteos?.length || 0))
     const m = Math.max(Number(x.M) || 1, ...x.filas.map((f) => f.od?.lecturas?.length || 0))
     setFilas(x.filas.map((f) => ({
-      ...filaVacia(f.muestra, f.rep, k, m), ...f,
+      ...filaVacia(f.muestra, f.rep, k, m), repManual: true, ...f,
       conteos: Array.from({ length: k }, (_, i) => f.conteos?.[i] ?? ''),
       od: { blanco: '', dil: '', ...(f.od || {}), lecturas: Array.from({ length: m }, (_, i) => f.od?.lecturas?.[i] ?? '') },
     })))
     setK(k)
     setM(m)
-    setOpts({ ...optsDef(), ...(x.opts || {}) })
+    setOpts((o) => ({ ...optsDef(), ...(x.opts || {}), nombres: [...new Set([...(o.nombres || []), ...(x.opts?.nombres || [])])] }))
     setEstilos(x.estilos || {})
   }
   const continuarAnterior = () => { try { aplicarSesion(g) } catch { /* nada */ } setPendiente(false) }
@@ -86,7 +88,7 @@ export default function App() {
     avisar, corr, irA: setTab,
     exportarSesion: () => ({ version: 1, programa: 'recuento-ufc', filas, K, M, opts, estilos }),
     importarSesion: aplicarSesion,
-    nuevo: () => { setFilas([]); setK(K_DEF); setM(1); setOpts(optsDef()) },
+    nuevo: () => { setFilas([]); setK(K_DEF); setM(1); setOpts((o) => ({ ...optsDef(), nombres: o.nombres })) },
   }
 
   const Vista = { archivo: ArchivoTab, datos: DatosTab, od: ODTab, tabla: TablaTab, curva: CurvaTab, metodo: MetodoTab }[tab]
