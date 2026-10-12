@@ -1,11 +1,12 @@
 import { useRef } from 'react'
 import { plantilla } from '../excel.js'
 import { Campo, Check } from './ui.jsx'
-import { textoCondiciones } from '../modelo.js'
+import { cepasDe, textoCondiciones } from '../modelo.js'
 import { descargarBlob } from '../utils.js'
 
 export function ArchivoTab({ s }) {
   const c = s.opts.condiciones || {}
+  const cepas = cepasDe(s.filas)
   const ref = useRef()
   const guardar = () => descargarBlob(new Blob([JSON.stringify(s.exportarSesion())], { type: 'application/json' }), 'sesion_recuento_ufc.json')
   const cargar = async (file) => {
@@ -41,8 +42,10 @@ export function ArchivoTab({ s }) {
         <section className="tarjeta">
           <h2>Condiciones del experimento</h2>
           <p className="ayuda" style={{ marginTop: 0 }}>Una curva de calibración solo vale para estas condiciones. Se agregan como hoja «Condiciones» en todos los Excel descargados.</p>
+          <p style={{ margin: '4px 0 6px' }}><b>{cepas.length === 1 ? 'Cepa' : 'Cepas'}:</b> {cepas.length ? cepas.join(', ') : <span className="ayuda">se toman de la columna Muestra en Datos</span>}
+            {cepas.length > 1 && <span className="ayuda"> · cada una tiene su propia curva de calibración y sus parámetros de crecimiento</span>}</p>
           <div className="fila-ctrl">
-            {[['cepa', 'Cepa', 'L100A1'], ['medio', 'Medio de cultivo', 'BHI'], ['temperatura', 'Temperatura (°C)', '37'], ['fecha', 'Fecha', '']].map(([k, t, ph]) => (
+            {[['medio', 'Medio de cultivo', 'BHI'], ['temperatura', 'Temperatura (°C)', '37'], ['fecha', 'Fecha', '']].map(([k, t, ph]) => (
               <Campo key={k} label={t}>
                 <input type={k === 'fecha' ? 'date' : 'text'} style={{ width: k === 'temperatura' ? 90 : 150 }} placeholder={ph} value={c[k] || ''}
                   onChange={(e) => s.setOpt('condiciones', { ...c, [k]: e.target.value })} />
@@ -51,7 +54,7 @@ export function ArchivoTab({ s }) {
           </div>
           <Campo label="Notas"><input value={c.notas || ''} placeholder="Agitación, inóculo, fase…" onChange={(e) => s.setOpt('condiciones', { ...c, notas: e.target.value })} /></Campo>
           <Check label="Mostrar las condiciones al pie de los gráficos" checked={s.opts.notaCondiciones} onChange={(v) => s.setOpt('notaCondiciones', v)}
-            ayuda={textoCondiciones(s.opts) || 'Completá algún dato para verlo'} />
+            ayuda={textoCondiciones(s.opts, s.filas) || 'Completá algún dato para verlo'} />
         </section>
         <section className="tarjeta">
           <h2>Nombres de muestra guardados</h2>

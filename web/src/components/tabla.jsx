@@ -164,7 +164,7 @@ function ResumenTiempo({ s, filas, onda, u }) {
     <section className="tarjeta">
       <div className="titulo-fila">
         <h2>Resumen por tiempo <small className="ayuda">(la tabla que se reporta)</small></h2>
-        <button className="primario chico" onClick={() => excelDe([{ nombre: 'Resumen por tiempo', columnas: cols, filas: datos }, hojaCondiciones(s.opts)]).then((b) => descargarBlob(b, 'resumen_por_tiempo.xlsx'))}>Descargar Excel</button>
+        <button className="primario chico" onClick={() => excelDe([{ nombre: 'Resumen por tiempo', columnas: cols, filas: datos }, hojaCondiciones(s.opts, s.filas)]).then((b) => descargarBlob(b, 'resumen_por_tiempo.xlsx'))}>Descargar Excel</button>
       </div>
       <div className="tabla-scroll">
         <table className="tabla">
@@ -199,7 +199,7 @@ function Predicciones({ s, preds, onda, u }) {
     <section className="tarjeta">
       <div className="titulo-fila">
         <h2>UFC/mL estimadas con la curva <small className="ayuda">({preds.length} {preds.length === 1 ? 'réplica' : 'réplicas'} con OD y sin recuento válido)</small></h2>
-        <button className="chico" onClick={() => excelDe([{ nombre: 'Estimadas por curva', columnas: cols, filas: datos }, hojaCondiciones(s.opts)]).then((b) => descargarBlob(b, 'ufc_estimadas.xlsx'))}>Descargar Excel</button>
+        <button className="chico" onClick={() => excelDe([{ nombre: 'Estimadas por curva', columnas: cols, filas: datos }, hojaCondiciones(s.opts, s.filas)]).then((b) => descargarBlob(b, 'ufc_estimadas.xlsx'))}>Descargar Excel</button>
       </div>
       <div className="tabla-scroll chica">
         <table className="tabla">

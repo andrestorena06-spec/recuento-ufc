@@ -328,3 +328,4 @@ h3.normal { text-transform: none; letter-spacing: 0; font-size: 14px; color: var
 .lista-muestras-pop small { color: var(--suave); font-size: 11px; white-space: nowrap; }
 .grilla td.od-fuera-ventana input { background: #fff6dc; color: #8a5a00; }
 .grilla td.od-fuera input { background: #fde9c8; font-weight: 650; }
+.interp-ok { background: #f0f8ea; border: 1px solid #d5e8c6; color: #2b5a17; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; }

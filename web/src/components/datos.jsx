@@ -120,7 +120,7 @@ export function DatosTab({ s }) {
     const colsM = ['Muestra', tCol, 'Réplicas', 'n con valor', 'Media log10 UFC/mL', 'DE log10', 'Media geométrica UFC/mL', 'IC95 inf', 'IC95 sup', 'Media aritmética UFC/mL', 'CV %']
     const filasM = resumenG.map((m) => ({ Muestra: m.muestra, [tCol]: finito(m.t) ? m.t : m.tiempo, Réplicas: m.nRep, 'n con valor': m.n, 'Media log10 UFC/mL': m.logMedia, 'DE log10': m.logDe,
       'Media geométrica UFC/mL': m.geo, 'IC95 inf': m.icGeo[0], 'IC95 sup': m.icGeo[1], 'Media aritmética UFC/mL': m.aritm, 'CV %': m.cv }))
-    excelDe([{ nombre: 'Recuentos', columnas: cols, filas: datos }, { nombre: 'Por muestra y tiempo', columnas: colsM, filas: filasM }, hojaCondiciones(o)])
+    excelDe([{ nombre: 'Recuentos', columnas: cols, filas: datos }, { nombre: 'Por muestra y tiempo', columnas: colsM, filas: filasM }, hojaCondiciones(o, s.filas)])
       .then((b) => descargarBlob(b, 'recuento_ufc.xlsx'))
   }
 

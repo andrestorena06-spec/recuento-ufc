@@ -18,7 +18,7 @@ export function CurvaTab({ s }) {
   const onda = ondaDe(o)
   const ejeOD = `OD${onda ? ' a ' + onda + ' nm' : ''}`
   const ejeOD2 = o.puntos === 'dilucion' ? ejeOD : `OD corregida${onda ? ' (' + onda + ' nm)' : ''}`
-  const { todos, usados, ajustes, lin } = s.curva
+  const { todos, usados, usadosDet, ajustes, lin, separadas, detalle, cepas, porCepa, comparacion: cmpCepas } = s.curva
   const aj = ajustes[o.modelo]
   const ok = aj && !aj.error
   const u = o.unidadTiempo || 'h'
@@ -29,6 +29,7 @@ export function CurvaTab({ s }) {
   const colD = paletaMuestras(dils.map(String))
   const colM = paletaMuestras(s.corr.muestras)
   const colT = paletaMuestras(tiempos)
+  const colorCurva = separadas ? colM[detalle] : '#3a2a1e'
   const colorDe = (p) => (porTiempo ? colT[p.tiempo] : porDil ? colD[String(p.k)] : colM[p.muestra])
   const nombreDe = (p) => (p.tipo === 'promedio' ? `${p.etiqueta}, ${etiquetaK(p.k).toLowerCase()} (promedio)` : `${p.etiqueta}, réplica ${p.rep}, ${etiquetaK(p.k).toLowerCase()}`)
   const [barras, setBarras] = useState(true)
@@ -38,8 +39,8 @@ export function CurvaTab({ s }) {
     s.setOpt('excluidos', ex)
   }
 
-  // curva y bandas sobre el rango de OD de los puntos usados
-  const xs = usados.map((p) => p.x).filter((x) => x > 0)
+  // curva y bandas sobre el rango de OD de los puntos usados (de la cepa del detalle si hay una curva por cepa)
+  const xs = usadosDet.map((p) => p.x).filter((x) => x > 0)
   const xmin = xs.length ? Math.min(...xs) : 0.01
   const xmax = xs.length ? Math.max(...xs) : 1
   const curvaPts = useMemo(() => {
@@ -69,13 +70,21 @@ export function CurvaTab({ s }) {
       : porTiempo
       ? tiempos.filter((t) => todos.some((p) => p.tiempo === t)).slice(0, 14).map((t) => ({ texto: t === '' ? '(sin tiempo)' : `${t} ${u}`, color: colT[t] }))
       : s.corr.muestras.filter((m) => todos.some((p) => p.muestra === m)).slice(0, 14).map((m) => ({ texto: m || '(sin nombre)', color: colM[m] }))),
-    ...(ok ? [{ texto: MODELOS[o.modelo].corto, color: '#3a2a1e', linea: true }] : []),
-    ...(ok && o.bandaC ? [{ texto: 'IC 95 % curva', color: '#d9731f', banda: true, opacidad: 0.3 }] : []),
-    ...(ok && o.bandaP ? [{ texto: 'Predicción 95 %', color: '#8a7765', linea: true, dash: '4 4' }] : []),
+    ...(ok ? [{ texto: separadas ? `${MODELOS[o.modelo].corto}, una por cepa` : MODELOS[o.modelo].corto, color: '#3a2a1e', linea: true }] : []),
+    ...(ok && o.bandaC ? [{ texto: separadas ? `IC 95 % (${detalle})` : 'IC 95 % curva', color: separadas ? colorCurva : '#d9731f', banda: true, opacidad: 0.3 }] : []),
+    ...(ok && o.bandaP ? [{ texto: separadas ? `Predicción 95 % (${detalle})` : 'Predicción 95 %', color: '#8a7765', linea: true, dash: '4 4' }] : []),
   ]
-  const bandas = ok && o.bandaC ? [{ sup: curvaPts.map(([x, b]) => [x, b.c[1]]), inf: curvaPts.map(([x, b]) => [x, b.c[0]]), color: '#d9731f', opacidad: 0.18 }] : []
+  // con una curva por cepa: la línea de cada cepa en su color, sobre su propio rango de OD
+  const lineaDe = (a, x0, x1) => {
+    const log = o.escalaX === 'log' || a.M.escala === 'loglog'
+    const lo = log ? x0 / 1.15 : 0, hi = x1 * 1.08
+    return Array.from({ length: 120 }, (_, i) => { const x = log ? lo * (hi / lo) ** (i / 119) : lo + ((hi - lo) * i) / 119; return [x, a.pred(x)] })
+  }
+  const otras = separadas ? porCepa.filter((c) => c.muestra !== detalle && c.aj).map((c) => ({ pts: lineaDe(c.aj, c.xmin, c.xmax), color: colM[c.muestra], ancho: 2 })) : []
+  const bandas = ok && o.bandaC ? [{ sup: curvaPts.map(([x, b]) => [x, b.c[1]]), inf: curvaPts.map(([x, b]) => [x, b.c[0]]), color: separadas ? colorCurva : '#d9731f', opacidad: 0.15 }] : []
   const curvas = ok ? [
-    { pts: curvaPts.map(([x, b]) => [x, b.y]), color: '#3a2a1e', ancho: 2.2 },
+    ...otras,
+    { pts: curvaPts.map(([x, b]) => [x, b.y]), color: colorCurva, ancho: 2.4 },
     ...(o.bandaP ? [{ pts: curvaPts.map(([x, b]) => [x, b.p[0]]), color: '#8a7765', dash: '4 4', ancho: 1.2 }, { pts: curvaPts.map(([x, b]) => [x, b.p[1]]), color: '#8a7765', dash: '4 4', ancho: 1.2 }] : []),
   ] : []
 
@@ -95,7 +104,7 @@ export function CurvaTab({ s }) {
       nombre: 'Parámetros', columnas: ['Parámetro', 'Estimación', 'Error estándar', 'IC95 inf', 'IC95 sup', 't', 'p'],
       filas: aj.M.params.map((nm, i) => ({ Parámetro: nm, Estimación: aj.f.beta[i], 'Error estándar': aj.f.se[i], 'IC95 inf': aj.f.ic[i][0], 'IC95 sup': aj.f.ic[i][1], t: aj.f.t[i], p: aj.f.p[i] })),
     })
-    hojas.push(hojaCondiciones(o))
+    hojas.push(hojaCondiciones(o, s.filas))
     excelDe(hojas).then((b) => descargarBlob(b, `curva_${o.modelo}.xlsx`))
   }
 
@@ -105,6 +114,19 @@ export function CurvaTab({ s }) {
         <h2>Curva de calibración</h2>
         <Campo label="OD de cada punto"><PuntosSel s={s} /></Campo>
         <Campo label="Réplicas"><ModoSel s={s} /></Campo>
+        {cepas.length > 1 && (
+          <Campo label={`Curva (${cepas.length} cepas)`}>
+            <div className="seg">
+              <button className={o.curvaPor !== 'comun' ? 'on' : ''} onClick={() => s.setOpt('curvaPor', 'cepa')}>Una por cepa</button>
+              <button className={o.curvaPor === 'comun' ? 'on' : ''} onClick={() => s.setOpt('curvaPor', 'comun')}>Común a todas</button>
+            </div>
+          </Campo>
+        )}
+        {separadas && (
+          <Campo label="Cepa del detalle (resultados, residuos, calculadora)">
+            <Select value={detalle} onChange={(v) => s.setOpt('cepaDetalle', v)} opciones={cepas.map((c) => [c, c])} />
+          </Campo>
+        )}
         <Campo label="Modelo">
           <Select value={o.modelo} onChange={(v) => s.setOpt('modelo', v)} opciones={Object.entries(MODELOS).map(([k, m]) => [k, m.nombre])} />
         </Campo>
@@ -130,6 +152,13 @@ export function CurvaTab({ s }) {
         <Check label="Barras de error en los puntos" checked={barras} onChange={setBarras}
           ayuda={o.modo === 'promedio' ? '± 1 DE (OD y log₁₀ UFC)' : 'IC 95 % de Poisson del recuento'} />
         <h3>Rango de tiempo del ajuste</h3>
+        {separadas && Object.keys(o.rangosCepa || {}).some((m) => cepas.includes(m)) && (
+          <div className="aviso-sel" style={{ marginBottom: 6 }}>
+            Por cepa (desde Crecimiento): {Object.entries(o.rangosCepa).filter(([m]) => cepas.includes(m)).map(([m, r]) => `${m} ${r[0]}–${r[1]} ${u}`).join(' · ')}.{' '}
+            <button className="enlace" onClick={() => s.setOpt('rangosCepa', {})}>Quitar</button>
+            <br /><small>Las cepas sin rango propio usan el general de abajo.</small>
+          </div>
+        )}
         <div className="fila-ctrl">
           <Campo label={`Desde (${u})`}><input value={o.tMin} placeholder="sin límite" onChange={(e) => s.setOpt('tMin', e.target.value)} /></Campo>
           <Campo label={`Hasta (${u})`}><input value={o.tMax} placeholder="sin límite" onChange={(e) => s.setOpt('tMax', e.target.value)} /></Campo>
@@ -153,14 +182,17 @@ export function CurvaTab({ s }) {
           <>
             <PanelGrafico estilo={s.estilos.curva} setEstilo={s.setEstilo('curva')} nombre={`curva_${o.modelo}`} alto={460}
               puntos={puntos} curvas={curvas} bandas={bandas} leyenda={leyenda} onClickPunto={alternar} nota={s.nota}
-              anotacion={ok && o.mostrarEcuacion ? [aj.M.ecuacionCorta ? aj.M.ecuacionCorta(aj.f.beta) : aj.M.ecuacion(aj.f.beta), `R² = ${aj.f.r2.toFixed(4)} · n = ${aj.f.n}`] : []}
+              anotacion={!o.mostrarEcuacion ? [] : separadas
+                ? porCepa.filter((c) => c.aj).map((c) => `${c.muestra}: ${(c.aj.M.ecuacionCorta || c.aj.M.ecuacion)(c.aj.f.beta)} · R² = ${c.aj.f.r2.toFixed(3)}`)
+                : ok ? [aj.M.ecuacionCorta ? aj.M.ecuacionCorta(aj.f.beta) : aj.M.ecuacion(aj.f.beta), `R² = ${aj.f.r2.toFixed(4)} · n = ${aj.f.n}`] : []}
               ejeX={{ titulo: ejeOD2, log: o.escalaX === 'log', cero: o.escalaX !== 'log' }}
               ejeY={ejeUFC(o)} />
-            {aj?.error && <p className="banner">{aj.error}</p>}
-            {ok && <Resultados aj={aj} s={s} />}
+            {cepas.length > 1 && <CurvasPorCepa s={s} porCepa={porCepa} cmp={cmpCepas} colM={colM} separadas={separadas} />}
+            {aj?.error && <p className="banner">{separadas ? `${detalle}: ` : ''}{aj.error}</p>}
+            {ok && <Resultados aj={aj} s={s} cepa={separadas ? detalle : null} />}
             {comparacion.length > 0 && (
               <section style={{ marginTop: 22 }}>
-                <h3>Comparación de modelos</h3>
+                <h3>Comparación de modelos{separadas ? ` · ${detalle}` : ''}</h3>
                 <div className="tabla-scroll chica">
                   <table className="tabla">
                     <thead><tr><th>Modelo</th><th>n</th><th>R² (propia escala)</th><th>RMSE log₁₀</th><th>Error relativo medio</th><th>AICc</th><th>ΔAICc</th><th /></tr></thead>
@@ -182,7 +214,7 @@ export function CurvaTab({ s }) {
             )}
             {ok && <Interpretacion ajustes={ajustes} aj={aj} usados={usados} lin={lin} o={o} />}
             {ok && <Residuos s={s} aj={aj} colorDe={colorDe} nombreDe={nombreDe} ejeOD={ejeOD2} />}
-            {ok && <Calculadora aj={aj} xmin={xmin} xmax={xmax} onda={onda} corregida={o.puntos !== 'dilucion'} />}
+            {ok && <Calculadora aj={aj} xmin={xmin} xmax={xmax} onda={onda} corregida={o.puntos !== 'dilucion'} cepa={separadas ? detalle : null} />}
           </>
         )}
       </div>
@@ -190,11 +222,11 @@ export function CurvaTab({ s }) {
   )
 }
 
-function Resultados({ aj, s }) {
+function Resultados({ aj, s, cepa }) {
   const { f, M } = aj
   return (
     <section style={{ marginTop: 18 }}>
-      <h3 className="normal">Ajuste: {M.nombre}</h3>
+      <h3 className="normal">Ajuste{cepa ? ` de ${cepa}` : ''}: {M.nombre}</h3>
       <div className="ecuacion">{M.ecuacion(f.beta)}</div>
       <div className="tabla-scroll chica">
         <table className="tabla">
@@ -245,7 +277,7 @@ function Residuos({ s, aj, colorDe, nombreDe, ejeOD }) {
   )
 }
 
-function Calculadora({ aj, xmin, xmax, onda, corregida }) {
+function Calculadora({ aj, xmin, xmax, onda, corregida, cepa }) {
   const [od, setOd] = useState('0.5')
   const [fac, setFac] = useState('1')
   const [ufc, setUfc] = useState('1e8')
@@ -261,7 +293,7 @@ function Calculadora({ aj, xmin, xmax, onda, corregida }) {
   const xo = odParaUFC(aj, objetivo, xmax)
   return (
     <section style={{ marginTop: 22 }}>
-      <h3>Calculadora</h3>
+      <h3>Calculadora{cepa ? ` · curva de ${cepa}` : ''}</h3>
       <div className="calc">
         <div className="tarjeta">
           <h4>OD → UFC/mL</h4>
@@ -291,6 +323,44 @@ function Calculadora({ aj, xmin, xmax, onda, corregida }) {
           ) : <p className="nota">{objetivo > 0 ? 'La curva no alcanza ese valor en el rango de OD razonable.' : 'Ingresá un valor positivo.'}</p>}
         </div>
       </div>
+    </section>
+  )
+}
+
+// Una ecuación por cepa y la prueba de si hacen falta curvas distintas
+function CurvasPorCepa({ s, porCepa, cmp, colM, separadas }) {
+  const o = s.opts
+  return (
+    <section style={{ marginTop: 18 }}>
+      <h3 className="normal">Curva de cada cepa</h3>
+      <div className="tabla-scroll chica">
+        <table className="tabla">
+          <thead><tr><th>Cepa</th><th>n</th><th>Ecuación ({MODELOS[o.modelo].corto})</th><th>R²</th><th>Rango de OD</th><th /></tr></thead>
+          <tbody>
+            {porCepa.map((c) => (
+              <tr key={c.muestra} className={separadas && c.muestra === s.curva.detalle ? 'fila-activa' : ''}>
+                <td><i className="punto-placa" style={{ background: colM[c.muestra] }} /> <b>{c.muestra || '(sin nombre)'}</b></td>
+                <td>{c.n}</td>
+                {c.aj ? <>
+                  <td><code>{c.aj.M.ecuacion(c.aj.f.beta)}</code></td>
+                  <td>{c.aj.f.r2.toFixed(4)}</td>
+                  <td>{c.xmin.toFixed(3)} – {c.xmax.toFixed(3)}</td>
+                </> : <td colSpan={3} className="ayuda">{c.error}</td>}
+                <td>{separadas && c.aj && c.muestra !== s.curva.detalle && <button className="chico" onClick={() => s.setOpt('cepaDetalle', c.muestra)}>Ver detalle</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {cmp ? (
+        <p className={cmp.p < 0.05 ? (separadas ? 'interp-ok' : 'aviso-sel') : 'nota'} style={{ marginTop: 8 }}>
+          <b>¿Hace falta una curva por cepa?</b> Prueba F (curva común frente a una por cepa, modelo {MODELOS[o.modelo].corto}):
+          F({cmp.d1}, {cmp.d2}) = {cmp.F.toFixed(2)}, p {fmtP(cmp.p)}.{' '}
+          {cmp.p < 0.05
+            ? <>Las cepas <b>difieren</b>: la relación OD ↔ UFC no es la misma, así que cada cepa necesita su propia curva{separadas ? ' (es lo que se está usando).' : '. Conviene elegir «Una por cepa».'}</>
+            : <>No hay evidencia de que las cepas difieran: {separadas ? 'se podría usar una curva común a todas (más puntos, intervalos más estrechos).' : 'la curva común es adecuada.'} Con pocos puntos la prueba tiene poca potencia.</>}
+        </p>
+      ) : <p className="nota">Para comparar las cepas hace falta que al menos dos tengan curva propia.</p>}
     </section>
   )
 }

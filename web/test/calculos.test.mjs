@@ -4,7 +4,7 @@ import { calcularFila, leerConteo, leerFactor } from '../src/ufc.js'
 import { icPoisson, qchisq } from '../src/estadistica.js'
 import { separarReplica, columnaDilucion, interpretarTabla } from '../src/excel.js'
 import { numerarReplicas } from '../src/modelo.js'
-import { correspondencia, linealidadOD, odCorregida } from '../src/calibracion.js'
+import { ajustar, compararCepas, correspondencia, linealidadOD, odCorregida } from '../src/calibracion.js'
 import { parametrosCrecimiento } from '../src/crecimiento.js'
 
 const o = { rango: '30-300', metodo: 'ponderada', volDef: 100 }
@@ -90,4 +90,9 @@ for (const t of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
 const g = parametrosCrecimiento(pts)
 assert.equal(g.t1, 1); assert.equal(g.t2, 6)
 cerca(g.mu, 0.8, 1e-6); cerca(g.lag, 1, 1e-6)
+// comparación de cepas (prueba F, igual a anova_lm(común, por cepa) de statsmodels / anova() de R)
+const cA = [[0.1, 7.1], [0.2, 7.45], [0.3, 7.6], [0.45, 7.9], [0.6, 8.05], [0.8, 8.3]].map(([x, z]) => ({ x, y: 10 ** z, muestra: 'A' }))
+const cB = [[0.1, 7.3], [0.25, 7.8], [0.35, 8.0], [0.5, 8.3], [0.7, 8.6], [0.9, 8.85]].map(([x, z]) => ({ x, y: 10 ** z, muestra: 'B' }))
+const fc = compararCepas(ajustar([...cA, ...cB], 'semilog'), [{ muestra: 'A', aj: ajustar(cA, 'semilog') }, { muestra: 'B', aj: ajustar(cB, 'semilog') }])
+cerca(fc.F, 12.557883, 1e-6); cerca(fc.p, 3.405812e-3, 1e-5)
 console.log('Todas las pruebas pasaron.')
