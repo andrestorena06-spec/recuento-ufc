@@ -2,6 +2,7 @@
 // Lectura de Excel/CSV con recuentos y OD, plantilla y exportación.
 // ============================================================
 import { finito } from './estadistica.js'
+import { cepasDe } from './modelo.js'
 
 // ---------- lectura cruda ----------
 async function decodificar(file) {
@@ -184,12 +185,13 @@ export async function plantilla() {
 }
 
 // Hoja con las condiciones del experimento (se agrega a las exportaciones)
-export function hojaCondiciones(o) {
+export function hojaCondiciones(o, filasDatos = []) {
   const c = o.condiciones || {}
+  const cepas = cepasDe(filasDatos)
   const onda = o.onda === 'otra' ? o.ondaOtra : o.onda
   const equipo = { cubeta: 'Espectrofotómetro, cubeta 1 cm', placa: 'Lector de microplacas', otro: 'Otro' }[o.equipo] || ''
   const filas = [
-    ['Cepa', c.cepa], ['Medio de cultivo', c.medio], ['Temperatura (°C)', c.temperatura], ['Fecha', c.fecha],
+    [cepas.length === 1 ? 'Cepa' : 'Cepas', cepas.join(', ')], ['Medio de cultivo', c.medio], ['Temperatura (°C)', c.temperatura], ['Fecha', c.fecha],
     ['Longitud de onda (nm)', onda], ['Equipo de OD', equipo], ['Lecturas corregidas por el blanco', o.blancoCorregido ? 'Sí' : 'No'],
     ['Ventana lineal de OD', `${o.odLinMin} – ${o.odLinMax}`], ['Volumen sembrado (µL)', o.volFijo ? o.volDef : 'por fila'],
     ['Rango contable', o.rango === 'custom' ? `${o.min}–${o.max}` : o.rango], ['Notas', c.notas],

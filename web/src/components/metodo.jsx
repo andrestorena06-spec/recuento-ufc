@@ -106,6 +106,12 @@ export function MetodoTab({ s }) {
           <li><b>Normalidad de residuos</b>: prueba de Shapiro–Wilk (algoritmo de Royston, igual a <code>shapiro.test()</code>).</li>
           <li><b>Factor de conversión directo</b> (pestaña Tabla): media geométrica de UFC/OD de los puntos.</li>
         </ul>
+        <h4>Una curva por cepa</h4>
+        <p>La relación OD ↔ UFC depende del tamaño y la forma de las células, así que cada cepa (cada nombre de la columna Muestra) tiene por defecto <b>su propia curva</b>, dibujada en su color, con su ecuación y su R². Los resultados detallados (parámetros, comparación de modelos, residuos y calculadora) se muestran para la cepa elegida, y las UFC/mL estimadas usan la curva de su propia cepa. Con «Usar en la curva» (pestaña Crecimiento) cada cepa queda limitada a su propia fase exponencial.</p>
+        <p><b>¿Hace falta una curva por cepa?</b> Se responde con una <b>prueba F de comparación de regresiones</b> (suma de cuadrados extra): se ajusta una curva común a todas las cepas (modelo reducido) y una curva por cepa (modelo completo), con el mismo modelo y la misma ponderación:</p>
+        <p className="ecuacion">F = [(SSR_común − Σ SSR_cepa) / (gl_común − Σ gl_cepa)] / (Σ SSR_cepa / Σ gl_cepa)</p>
+        <p>Con p &lt; 0,05 las cepas difieren (en pendiente, en ordenada o en ambas) y cada una necesita su curva. Con p ≥ 0,05 no hay evidencia de diferencia y se puede usar una curva común (más puntos, intervalos más estrechos). Equivale a comparar <code>lm(y ~ x)</code> con <code>lm(y ~ x * cepa)</code> mediante <code>anova()</code> en R (verificado contra statsmodels).</p>
+
         <h4>UFC/mL estimadas con la curva</h4>
         <p>Si en algún tiempo hay OD pero no recuento (por ejemplo, lecturas más frecuentes que las siembras), su UFC/mL se estima con la ecuación elegida y su <b>intervalo de predicción 95 %</b>. Se muestran como «estimadas» (círculos huecos en Crecimiento) y se avisa si la OD cae fuera del rango usado para calibrar, porque extrapolar puede dar errores grandes.</p>
 
@@ -129,7 +135,7 @@ export function MetodoTab({ s }) {
         <p>Si µ por UFC y por OD difieren mucho, la relación OD ↔ células viables está cambiando durante el crecimiento (por ejemplo, células más grandes o muerte celular), y conviene calibrar solo con la fase exponencial.</p>
 
         <h3>12. Condiciones</h3>
-        <p>Una ecuación de calibración solo vale para la cepa, el medio, la temperatura, el equipo y la longitud de onda con que se hizo. Esos datos se cargan en Archivo, se agregan a todos los Excel y pueden mostrarse al pie de los gráficos.</p>
+        <p>Una ecuación de calibración solo vale para la cepa, el medio, la temperatura, el equipo y la longitud de onda con que se hizo. Las cepas se toman de la columna Muestra; el resto se carga en Archivo. Todo se agrega a los Excel y puede mostrarse al pie de los gráficos.</p>
 
         <h4>Diseño recomendado del experimento</h4>
         <ol>

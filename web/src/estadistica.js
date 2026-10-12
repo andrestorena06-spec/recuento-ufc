@@ -98,6 +98,8 @@ export function betaInc(x, a, b) {
   const bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * Math.log(x) + b * Math.log(1 - x))
   return x < (a + 1) / (a + b + 2) ? (bt * betacf(a, b, x)) / a : 1 - (bt * betacf(b, a, 1 - x)) / b
 }
+// pf de R (cola inferior): distribución F con d1 y d2 grados de libertad
+export const fCdf = (x, d1, d2) => (x <= 0 ? 0 : betaInc((d1 * x) / (d1 * x + d2), d1 / 2, d2 / 2))
 // pt de R (cola inferior)
 export const tCdf = (t, df) => {
   const p = 0.5 * betaInc(df / (df + t * t), df / 2, 0.5)

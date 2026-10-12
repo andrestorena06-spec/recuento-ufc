@@ -78,10 +78,18 @@ export function CrecimientoTab({ s }) {
     ...(zonas.length ? [{ texto: 'Fase exponencial', color: '#d9731f', banda: true, opacidad: 0.25 }] : []),
   ]
 
+  // con una curva por cepa, el rango es solo de esa cepa; con una curva común, es el rango general
+  const porCepa = o.curvaPor !== 'comun' && muestras.length > 1
   const usarFase = (p) => {
-    s.setOpts((x) => ({ ...x, tMin: String(p.t1), tMax: String(p.t2) }))
-    s.avisar(`Curva limitada a ${p.t1}–${p.t2} ${u} (fase exponencial de ${p.muestra}).`)
+    if (porCepa) {
+      s.setOpts((x) => ({ ...x, rangosCepa: { ...(x.rangosCepa || {}), [p.muestra]: [String(p.t1), String(p.t2)] } }))
+      s.avisar(`Curva de ${p.muestra} limitada a ${p.t1}–${p.t2} ${u} (su fase exponencial).`)
+    } else {
+      s.setOpts((x) => ({ ...x, tMin: String(p.t1), tMax: String(p.t2) }))
+      s.avisar(`Curva limitada a ${p.t1}–${p.t2} ${u} (fase exponencial de ${p.muestra}).`)
+    }
   }
+  const rangos = Object.entries(o.rangosCepa || {}).filter(([m]) => muestras.includes(m))
   const fmtT = (v) => (finito(v) ? (Math.abs(v) < 10 ? v.toFixed(2) : v.toFixed(1)) : '–')
   const exportar = () => {
     const cols = ['Muestra', 'Variable', `Fase exponencial desde (${u})`, `hasta (${u})`, `µ (1/${u})`, 'µ IC95 inf', 'µ IC95 sup', `Tiempo de generación (${u})`, `Latencia (${u})`, 'log10 inicial', 'log10 máximo', 'R²', 'n', 'Aviso']
@@ -92,7 +100,7 @@ export function CrecimientoTab({ s }) {
     const colsR = ['Muestra', `Tiempo (${u})`, 'OD corregida', 'DE OD', 'UFC/mL (media geométrica)', 'log10 UFC/mL', 'DE log10', 'UFC/mL estimada por curva']
     const filasR = resumenT.map((r) => ({ Muestra: r.muestra, [`Tiempo (${u})`]: finito(r.t) ? r.t : r.tiempo, 'OD corregida': r.od, 'DE OD': r.odDe,
       'UFC/mL (media geométrica)': r.nUFC ? r.geo : null, 'log10 UFC/mL': r.nUFC ? r.logMedia : null, 'DE log10': r.logDe, 'UFC/mL estimada por curva': r.pred ? r.pred.y : null }))
-    excelDe([{ nombre: 'Parámetros de crecimiento', columnas: cols, filas }, { nombre: 'Resumen por tiempo', columnas: colsR, filas: filasR }, hojaCondiciones(o)])
+    excelDe([{ nombre: 'Parámetros de crecimiento', columnas: cols, filas }, { nombre: 'Resumen por tiempo', columnas: colsR, filas: filasR }, hojaCondiciones(o, s.filas)])
       .then((b) => descargarBlob(b, 'crecimiento.xlsx'))
   }
 
@@ -151,12 +159,16 @@ export function CrecimientoTab({ s }) {
             <b>Fase exponencial</b>: tramo de tiempos consecutivos (al menos 3) donde log₁₀ crece en línea recta con la mayor pendiente; se busca primero la ventana de 3 tiempos más empinada con R² ≥ 0,97 y se extiende mientras siga recta y cada tramo agregado sea casi tan empinado.
             <b> µ</b> (tasa específica de crecimiento) = pendiente de log₁₀ × ln 10, ajustada con todas las réplicas del tramo; <b>tiempo de generación</b> = ln 2 / µ;
             <b> latencia</b> = tiempo en que la recta de la fase exponencial corta el nivel inicial. ⚠ = no hay un tramo recto claro (pocos tiempos o crecimiento irregular).
-            «Usar en la curva» limita la ecuación de calibración a ese rango de tiempo, como se recomienda.
+            «Usar en la curva» limita la ecuación de calibración a ese rango de tiempo, como se recomienda (con una curva por cepa, solo la de esa cepa).
           </p>
-          {o.tMin !== '' || o.tMax !== '' ? (
+          {porCepa && rangos.length > 0 && (
+            <p className="aviso-sel">Rango de tiempo de la curva de calibración: {rangos.map(([m, r]) => `${m} ${r[0]}–${r[1]} ${u}`).join(' · ')}.{' '}
+              <button className="enlace" onClick={() => s.setOpt('rangosCepa', {})}>Usar todos los tiempos</button></p>
+          )}
+          {!porCepa && (o.tMin !== '' || o.tMax !== '') && (
             <p className="aviso-sel">La curva de calibración está limitada a {o.tMin || '…'}–{o.tMax || '…'} {u}.{' '}
               <button className="enlace" onClick={() => s.setOpts((x) => ({ ...x, tMin: '', tMax: '' }))}>Usar todos los tiempos</button></p>
-          ) : null}
+          )}
         </section>
 
         {preds.length > 0 && (

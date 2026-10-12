@@ -102,7 +102,7 @@ export default function App() {
     filas, setFilas, actualizarFila, K, setK, M, setM, opts, setOpts,
     setOpt: (k, v) => setOpts((o) => ({ ...o, [k]: v })),
     estilos, setEstilo: (k) => (e) => setEstilos((x) => ({ ...x, [k]: e })),
-    avisar, corr, curva, irA: setTab, nota: opts.notaCondiciones ? textoCondiciones(opts) : '',
+    avisar, corr, curva, irA: setTab, nota: opts.notaCondiciones ? textoCondiciones(opts, filas) : '',
     exportarSesion: () => ({ version: 3, programa: 'recuento-ufc', filas, K, M, opts, estilos }),
     importarSesion: aplicarSesion,
     nuevo: () => { setFilas([]); setK(K_DEF); setM(M_DEF); setOpts((o) => ({ ...optsDef(), nombres: o.nombres })) },
@@ -126,7 +126,7 @@ export default function App() {
           </button>
         ))}
         <div className="pie-nav">
-          {filas.length > 0 && <div className="chip-odc">{nMuestras} {nMuestras === 1 ? 'muestra' : 'muestras'} · {filas.length} réplicas</div>}
+          {filas.length > 0 && <div className="chip-odc">{nMuestras} {nMuestras === 1 ? 'cepa' : 'cepas'} · {filas.length} réplicas</div>}
           <small>OD a {onda || '?'} nm</small>
         </div>
       </nav>

@@ -2,7 +2,7 @@
 // Correspondencia OD ↔ UFC/mL y curva de calibración.
 // x = OD neta de la suspensión leída, y = UFC/mL de ESA suspensión.
 // ============================================================
-import { finito, media, desvio, mco, varAjuste, tCuantil, shapiroWilk, resumen } from './estadistica.js'
+import { finito, media, desvio, mco, varAjuste, tCuantil, shapiroWilk, resumen, fCdf } from './estadistica.js'
 import { calcularFila, esValor, leerFactor } from './ufc.js'
 import { claveGrupo, etiquetaGrupo, filaEnUso, tNorm, tNum } from './modelo.js'
 
@@ -316,12 +316,15 @@ export function datosCurva(corr, o) {
     const key = p.tipo === 'promedio' ? p.id : 'i:' + p.id
     const odMin = String(o.odMin ?? '').trim() === '' ? -Infinity : Number(o.odMin)
     const odMax = String(o.odMax ?? '').trim() === '' ? Infinity : Number(o.odMax)
-    const tMin = numero(o.tMin, -Infinity), tMax = numero(o.tMax, Infinity)
+    // rango de tiempo propio de la cepa (si se eligió con «Usar en la curva» en Crecimiento) o el general
+    const rc = o.curvaPor !== 'comun' ? o.rangosCepa?.[p.muestra] : null
+    const tMin = rc ? numero(rc[0], -Infinity) : numero(o.tMin, -Infinity)
+    const tMax = rc ? numero(rc[1], Infinity) : numero(o.tMax, Infinity)
     let motivo = ''
     if (o.excluidos.includes(key)) motivo = 'Excluido a mano'
     else if ((tMin > -Infinity || tMax < Infinity) && !finito(p.t)) motivo = 'Sin tiempo numérico'
-    else if (p.t < tMin) motivo = `Tiempo < ${o.tMin}`
-    else if (p.t > tMax) motivo = `Tiempo > ${o.tMax}`
+    else if (p.t < tMin) motivo = `Tiempo < ${tMin}`
+    else if (p.t > tMax) motivo = `Tiempo > ${tMax}`
     else if (p.x < odMin) motivo = `OD < ${o.odMin}`
     else if (p.x > odMax) motivo = `OD > ${o.odMax}`
     else if (!(p.x > 0)) motivo = 'OD ≤ 0'
@@ -341,21 +344,59 @@ export function motivoSinPunto(p, o) {
   return ''
 }
 
-// Ajuste completo (lo usan Curva, Tabla y Crecimiento)
+// ¿Las cepas necesitan curvas distintas? Prueba F de suma de cuadrados extra (comparación de regresiones):
+// modelo reducido = una curva común a todas; modelo completo = una curva por cepa (mismo modelo y ponderación).
+// F = [(SSR_común − ΣSSR_cepa) / (gl_común − Σgl_cepa)] / (ΣSSR_cepa / Σgl_cepa)
+export function compararCepas(comun, porCepa) {
+  const sep = porCepa.filter((c) => c.aj && !c.aj.error)
+  if (!comun || comun.error || sep.length < 2) return null
+  const ssrS = sep.reduce((a, c) => a + c.aj.f.ssr, 0)
+  const glS = sep.reduce((a, c) => a + c.aj.f.gl, 0)
+  const ssrC = comun.f.ssr
+  const glC = comun.f.gl
+  const d1 = glC - glS
+  if (d1 <= 0 || glS <= 0) return null
+  const F = ((ssrC - ssrS) / d1) / (ssrS / glS)
+  const p = 1 - fCdf(Math.max(F, 0), d1, glS)
+  return { F, d1, d2: glS, p, cepas: sep.map((c) => c.muestra) }
+}
+
+// Ajuste completo (lo usan Curva, Tabla y Crecimiento).
+// o.curvaPor 'cepa' (por defecto): una curva por cepa (columna Muestra); el detalle (modelos, residuos, calculadora)
+// se muestra para la cepa elegida. o.curvaPor 'comun': una sola curva con todos los puntos.
 export function analisisCurva(corr, filas, o) {
   const { todos, usados } = datosCurva(corr, o)
-  const ajustes = Object.fromEntries(Object.keys(MODELOS).map((m) => [m, ajustar(usados, m, o.ponderacion)]))
+  const cepas = [...new Set(usados.map((p) => p.muestra))]
+  const rango = (pts) => { const xs = pts.map((p) => p.x).filter(finito); return xs.length ? [Math.min(...xs), Math.max(...xs)] : [NaN, NaN] }
+  const porCepa = cepas.map((m) => {
+    const pts = usados.filter((p) => p.muestra === m)
+    const a = ajustar(pts, o.modelo, o.ponderacion)
+    const [xmin, xmax] = rango(pts)
+    return { muestra: m, aj: a.error ? null : a, error: a.error, n: pts.length, xmin, xmax }
+  })
+  const ajComun = ajustar(usados, o.modelo, o.ponderacion)
+  const comparacion = compararCepas(ajComun.error ? null : ajComun, porCepa)
+  const separadas = o.curvaPor !== 'comun' && cepas.length > 1
+  const detalle = separadas ? (cepas.includes(o.cepaDetalle) ? o.cepaDetalle : cepas[0]) : null
+  const usadosDet = separadas ? usados.filter((p) => p.muestra === detalle) : usados
+  const ajustes = Object.fromEntries(Object.keys(MODELOS).map((m) => [m, ajustar(usadosDet, m, o.ponderacion)]))
   const aj = ajustes[o.modelo] && !ajustes[o.modelo].error ? ajustes[o.modelo] : null
-  const xs = usados.map((p) => p.x).filter(finito)
-  return { todos, usados, ajustes, aj, error: ajustes[o.modelo]?.error, lin: linealidadOD(filas, o), xmin: xs.length ? Math.min(...xs) : NaN, xmax: xs.length ? Math.max(...xs) : NaN }
+  const [xmin, xmax] = rango(usadosDet)
+  return {
+    todos, usados, usadosDet, ajustes, aj, error: ajustes[o.modelo]?.error, lin: linealidadOD(filas, o), xmin, xmax,
+    separadas, detalle, cepas, porCepa, comparacion,
+  }
 }
 
 // UFC/mL estimada con la curva para una fila (uso: filas con OD y sin recuento).
 // En modo 'corregida' se usa la OD corregida; en modo 'dilucion', cada lectura dentro de la ventana
 // se convierte con la curva y se lleva a la muestra (× 10ᵏ), y se promedia en log.
 export function predecirFila(curva, fila, o) {
-  const aj = curva?.aj
+  // con una curva por cepa se usa la de la cepa de la fila (si no tiene, no se estima)
+  const propia = curva?.separadas ? curva.porCepa.find((c) => c.muestra === fila.muestra) : null
+  const aj = curva?.separadas ? propia?.aj : curva?.aj
   if (!aj) return null
+  const xmin = propia ? propia.xmin : curva.xmin, xmax = propia ? propia.xmax : curva.xmax
   const lista = []
   if (o.puntos !== 'dilucion') {
     const oc = odCorregida(fila, o)
@@ -371,7 +412,7 @@ export function predecirFila(curva, fila, o) {
   if (!res.length) return null
   const lg = (v) => Math.log10(Math.max(v, 1e-300))
   const m = (f) => 10 ** media(res.map((r) => lg(f(r)) + r.k))
-  const extrapola = res.some((r) => r.x < curva.xmin || r.x > curva.xmax)
+  const extrapola = res.some((r) => r.x < xmin || r.x > xmax)
   return { y: m((r) => r.b.y), p: [m((r) => Math.max(r.b.p[0], 1e-300)), m((r) => r.b.p[1])], x: res[0].x, extrapola }
 }
 
