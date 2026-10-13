@@ -8,7 +8,7 @@ export const optsDef = () => ({
   rango: '30-300', min: 30, max: 300, metodo: 'ponderada', volDef: 100, volFijo: true, incluirEstimados: false,
   unidadTiempo: 'h', nombres: [],
   // OD: ventana lineal del fotómetro para elegir las lecturas que forman la OD corregida
-  onda: '600', ondaOtra: '', equipo: 'cubeta', blancoOD: '', blancoCorregido: false, origenOD: {},
+  onda: '600', ondaOtra: '', equipo: 'cubeta', blancoOD: '', blancoCorregido: false, origenGlobal: 'misma',
   odLinMin: 0.1, odLinMax: 0.8,
   // curva: puntos 'corregida' (OD corregida de cada réplica) o 'dilucion' (cada lectura con su dilución)
   puntos: 'corregida', modo: 'individual', modelo: 'semilog', ponderacion: 'relativa', escalaY: 'log10', escalaX: 'lin',

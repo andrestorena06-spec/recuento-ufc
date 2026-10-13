@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { moverFoco, navegar, pegarBloque, pegarTabla } from './importar.js'
 import { claveGrupo, filaVacia } from '../modelo.js'
 
-// Grilla tipo planilla compartida por Datos y OD.
+// Grilla tipo planilla compartida por C (colonias) y OD.
 // - Siempre hay una fila vacía al final: al escribir en ella pasa a ser una fila real y aparece otra.
 // - Pegar una tabla con encabezados la reparte por muestra + tiempo + réplica; sin encabezados pega desde la celda.
 // - Enter en una celda vacía de Tiempo copia el valor de la fila de arriba.

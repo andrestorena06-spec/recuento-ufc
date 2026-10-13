@@ -2,6 +2,8 @@ import { useMemo, useRef, useState } from 'react'
 import { Campo, Check, Modal, Select } from './ui.jsx'
 import { PanelGrafico } from './panelGrafico.jsx'
 import { Grilla, columnasBase } from './grilla.jsx'
+import { Ayuda, Calc } from './tip.jsx'
+import { dCV, dDE, dIC, dICMedia, dMediaGeo, dUFC } from '../desarrollos.js'
 import { importarArchivo } from './importar.js'
 import { claveGrupo, ejeUFC, etiquetaGrupo, filaEnUso, filaVacia, OPCIONES_EJE_UFC, tNorm, tNum, UNIDADES_T } from '../modelo.js'
 import { calcularFila, cient, ESTADOS, INCONTABLE, leerConteo, METODOS_UFC, RANGOS, rangoDe, sup, textoResultado, esValor, nombreRep } from '../ufc.js'
@@ -23,7 +25,7 @@ export function resumenGrupos(filas, o) {
     return {
       grupo: g, muestra: fs[0].muestra, tiempo: tNorm(fs[0].tiempo), t: tNum(fs[0].tiempo),
       etiqueta: etiquetaGrupo(fs[0].muestra, fs[0].tiempo, o.unidadTiempo),
-      nRep: rs.length, n: R.n, logMedia: R.media, logDe: R.de, logIc: R.ic,
+      nRep: rs.length, n: R.n, logs: vals.map((r) => r.logMadre), logMedia: R.media, logDe: R.de, logIc: R.ic,
       geo: 10 ** R.media, icGeo: [10 ** (R.media - R.ic), 10 ** (R.media + R.ic)],
       aritm: vals.length ? vals.reduce((s, r) => s + r.Nmadre, 0) / vals.length : NaN,
       cv: vals.length > 1 ? resumen(vals.map((r) => r.Nmadre)).cv : NaN,
@@ -129,7 +131,7 @@ export function DatosTab({ s }) {
     <div className="pagina" style={{ maxWidth: 'none' }}>
       <section className="tarjeta">
         <div className="titulo-fila">
-          <h2>Datos · recuento de colonias</h2>
+          <h2>C · recuento de colonias</h2>
           <div className="fila-ctrl" style={{ margin: 0 }}>
             <button onClick={() => plantilla().then((b) => descargarBlob(b, 'plantilla_recuento_ufc.xlsx'))}>Plantilla Excel</button>
             <button className="primario" onClick={() => (enUso.length ? setImportar(true) : elegirArchivo('agregar'))}>Cargar Excel</button>
@@ -169,12 +171,12 @@ export function DatosTab({ s }) {
         <Grilla s={s} columnas={columnas} sel={sel} onSel={setSel} normalizar={normalizar}
           cabExtra={<><button className="mas" title="Agregar una dilución más" onClick={agregarColumna}>+</button>{' '}
             <button className="mini" title="Quitar la última dilución" onClick={quitarColumna} disabled={K <= 1}>−</button></>}
-          cabResultados={['UFC/mL', 'IC 95 %', 'Estado', 'Avisos']}
+          cabResultados={[<Ayuda key="a" clave="ufc">UFC/mL</Ayuda>, <Ayuda key="b" clave="ic95">IC 95 %</Ayuda>, <Ayuda key="c" clave="estado">Estado</Ayuda>, 'Avisos']}
           resultados={(f) => {
             const res = resultados[f.id]
             return <>
-              <td className="res"><b>{textoResultado(res)}</b></td>
-              <td className="res">{finito(res.ic[0]) && ESTADOS[res.estado][1] !== 'cens' ? `${cient(res.ic[0], 1)} – ${cient(res.ic[1], 1)}` : ''}</td>
+              <td className="res"><Calc d={dUFC(res)}><b>{textoResultado(res)}</b></Calc></td>
+              <td className="res">{finito(res.ic[0]) && ESTADOS[res.estado][1] !== 'cens' ? <Calc d={dIC(res)}>{cient(res.ic[0], 1)} – {cient(res.ic[1], 1)}</Calc> : ''}</td>
               <td className="res" style={{ textAlign: 'center' }}><span className={`estado ${ESTADOS[res.estado][1]}`}>{ESTADOS[res.estado][0]}</span></td>
               <td className="res avisos-fila">{res.avisos.join(' · ')}</td>
             </>
@@ -199,20 +201,20 @@ export function DatosTab({ s }) {
       {resumenG.length > 0 && (
         <div className="rejilla-2">
           <section className="tarjeta">
-            <h2>Por muestra y tiempo <small className="ayuda">(UFC/mL)</small></h2>
+            <h2>Por cepa y tiempo <small className="ayuda">(UFC/mL)</small></h2>
             <div className="tabla-scroll">
               <table className="tabla">
-                <thead><tr><th>Muestra</th><th>Tiempo ({u})</th><th>n</th><th>Media geométrica</th><th>IC 95 % de la media</th><th>log₁₀ ± DE</th><th>CV %</th></tr></thead>
+                <thead><tr><th>Cepa</th><th>Tiempo ({u})</th><th><Ayuda clave="n">n</Ayuda></th><th><Ayuda clave="mediaGeo">Media geométrica</Ayuda></th><th><Ayuda clave="icMedia">IC 95 % de la media</Ayuda></th><th><Ayuda clave="logDe">log₁₀ ± DE</Ayuda></th><th><Ayuda clave="cv">CV %</Ayuda></th></tr></thead>
                 <tbody>
                   {resumenG.map((m) => (
                     <tr key={m.grupo}>
                       <td><i className="punto-placa" style={{ background: colores[m.muestra] }} /> <b>{m.muestra || '(sin nombre)'}</b></td>
                       <td>{m.tiempo || '–'}</td>
                       <td title={`${m.nRep} réplicas, ${m.n} con valor${m.censurados ? `, ${m.censurados} fuera de los límites` : ''}${m.estimados ? `, ${m.estimados} estimadas` : ''}`}>{m.n}/{m.nRep}</td>
-                      <td>{m.n ? cient(m.geo) : '–'}</td>
-                      <td>{m.n > 1 ? `${cient(m.icGeo[0], 1)} – ${cient(m.icGeo[1], 1)}` : '–'}</td>
-                      <td>{m.n ? `${m.logMedia.toFixed(2)}${m.n > 1 ? ' ± ' + m.logDe.toFixed(2) : ''}` : '–'}</td>
-                      <td>{finito(m.cv) ? m.cv.toFixed(0) : '–'}</td>
+                      <td>{m.n ? <Calc d={dMediaGeo(m.logs)}>{cient(m.geo)}</Calc> : '–'}</td>
+                      <td>{m.n > 1 ? <Calc d={dICMedia(m.logs)}>{cient(m.icGeo[0], 1)} – {cient(m.icGeo[1], 1)}</Calc> : '–'}</td>
+                      <td>{m.n ? <Calc d={m.n > 1 ? dDE(m.logs, 'Media y DE de log₁₀ UFC/mL', 3) : null}>{m.logMedia.toFixed(2)}{m.n > 1 ? ' ± ' + m.logDe.toFixed(2) : ''}</Calc> : '–'}</td>
+                      <td>{finito(m.cv) ? <Calc d={dCV(m.logs, true)}>{m.cv.toFixed(0)}</Calc> : '–'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -228,6 +230,7 @@ export function DatosTab({ s }) {
       )}
 
       {filaSel && <SerieDiluciones s={s} f={filaSel} r={resultados[filaSel.id]} />}
+      {!filaSel && enUso.length > 0 && <p className="nota">Hacé clic en una celda de la grilla para ver el <b>control de la serie de diluciones</b> de esa réplica.</p>}
 
       {importar && (
         <Modal titulo="Cargar Excel" onClose={() => setImportar(null)}
@@ -312,10 +315,19 @@ function SerieDiluciones({ s, f, r }) {
   }))
   const esperada = r.N > 0 && finito(r.N) ? Array.from({ length: 41 }, (_, i) => { const k = -0.5 + (K * i) / 40; return [k, r.N * r.V * 10 ** -k] }) : []
   const ceros = r.placas.filter((p) => p.c === 0).map((p) => etiquetaDil(p.k))
+  const [abierto, setAbierto] = useState(false)
   const nombre = `${etiquetaGrupo(f.muestra, f.tiempo, s.opts.unidadTiempo)}, réplica ${f.rep}`
   return (
     <section className="tarjeta">
-      <h2>Serie de diluciones de {nombre} <small className="ayuda">(fila seleccionada en la grilla)</small></h2>
+      <div className="titulo-fila">
+        <h2>Control de la serie de diluciones · {nombre} <small className="ayuda">(fila seleccionada)</small></h2>
+        <button className="chico" onClick={() => setAbierto(!abierto)}>{abierto ? 'Ocultar gráfico' : 'Ver gráfico'}</button>
+      </div>
+      <p className="ayuda" style={{ marginTop: 0 }}>
+        Muestra las colonias contadas en cada dilución de esta réplica. <b>Franja verde</b>: rango contable ({L}–{U} colonias). <b>Línea punteada</b>: lo esperado con el UFC/mL calculado si cada dilución baja exactamente ×10.
+        Puntos llenos: placas usadas; huecos: no usadas o incontables. Si los puntos se apartan de la línea hubo un error de dilución, pipeteo o colonias superpuestas.
+      </p>
+      {abierto && <>
       <p className="ayuda" style={{ marginTop: 0 }}>Al diluir 1:10, el recuento debería bajar 10 veces por columna: los puntos deben caer sobre la recta esperada (pendiente −1 en escala log). Un punto que se aparta indica un error de dilución, de pipeteo o colonias superpuestas. Las diluciones no sembradas (celdas vacías) no aparecen.</p>
       <PanelGrafico estilo={s.estilos.serie} setEstilo={s.setEstilo('serie')} nombre={`serie_${f.muestra}_${tNorm(f.tiempo)}_${f.rep}`} alto={300}
         puntos={puntos} rangoY={[0.8, U * 2.2, ...puntos.map((p) => p.y)]}
@@ -324,7 +336,8 @@ function SerieDiluciones({ s, f, r }) {
         ejeX={{ titulo: 'Dilución', categorias: cats }} ejeY={{ titulo: 'Colonias por placa', log: true }}
         leyenda={[{ texto: 'Usada', color: '#2f9e44' }, { texto: 'No usada / INC', color: '#d9731f', hueco: true },
           { texto: `Rango ${L}–${U}`, color: '#2f9e44', banda: true, opacidad: 0.15 }, { texto: 'Esperado', color: '#3a2a1e', linea: true, dash: '5 4' }]} />
-      {ceros.length > 0 && <p className="nota">Placas con 0 colonias (no se ven en escala log): {ceros.join(', ')}. Las incontables se dibujan arriba del rango.</p>}
+      </>}
+      {abierto && ceros.length > 0 && <p className="nota">Placas con 0 colonias (no se ven en escala log): {ceros.join(', ')}. Las incontables se dibujan arriba del rango.</p>}
     </section>
   )
 }

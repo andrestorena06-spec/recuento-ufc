@@ -71,7 +71,7 @@ export function MetodoTab({ s }) {
           <li><b>OD ≠ UFC</b>: la OD incluye células muertas y restos; una UFC puede venir de un agregado o una cadena de células. Por eso la relación cambia con la fase de crecimiento, el medio y la cepa (las variantes rugosas, SCV o formadoras de agregados pueden tener curvas muy distintas): hacé una curva para cada cepa y condición.</li>
         </ul>
 
-        <h3>8. ¿La OD es de la misma suspensión sembrada?</h3>
+        <h3>8. ¿La OD es de la misma suspensión sembrada? (opción en Archivo › Condiciones)</h3>
         <p><b>Misma suspensión</b>: cada réplica es un par real (OD, UFC/mL) y entra como un punto en modo individual. <b>Cultivo paralelo</b>: la réplica de OD y la de UFC son cultivos distintos, así que emparejarlas réplica a réplica es arbitrario; en modo individual esas muestras entran con un solo punto (OD media, UFC media geométrica). La variación entre cultivos se suma a la dispersión de la curva.</p>
 
         <h3>9. Correspondencia y curva de calibración</h3>
@@ -120,7 +120,7 @@ export function MetodoTab({ s }) {
           <li><b>UFC/mL</b> abarcan varios órdenes de magnitud: se grafican como <b>log₁₀ UFC/mL</b> (eje con valores 2…9; 10⁸ se ve como 8). Se puede cambiar a escala logarítmica con 10ⁿ o a escala lineal.</li>
           <li><b>OD</b> se grafica en escala lineal.</li>
           <li><b>Curva de crecimiento</b> (pestaña Crecimiento): tiempo en X, OD corregida en el eje izquierdo y log₁₀ UFC/mL en el derecho, con la media ± DE de cada tiempo.</li>
-          <li><b>Barras</b> (pestaña Datos): media geométrica (log₁₀ ± DE) de cada muestra en un tiempo, con las réplicas encima, para comparar muestras o tratamientos.</li>
+          <li><b>Barras</b> (pestaña C): media geométrica (log₁₀ ± DE) de cada muestra en un tiempo, con las réplicas encima, para comparar muestras o tratamientos.</li>
           <li><b>Correlación</b> (pestaña Curva): OD en X, UFC/mL en Y, con la ecuación y el R² sobre el gráfico.</li>
         </ul>
 

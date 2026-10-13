@@ -329,3 +329,27 @@ h3.normal { text-transform: none; letter-spacing: 0; font-size: 14px; color: var
 .grilla td.od-fuera-ventana input { background: #fff6dc; color: #8a5a00; }
 .grilla td.od-fuera input { background: #fde9c8; font-weight: 650; }
 .interp-ok { background: #f0f8ea; border: 1px solid #d5e8c6; color: #2b5a17; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; }
+
+/* ---------- Recuadros de ayuda y desarrollos ---------- */
+input[type=date] { width: 100%; padding: 7px 10px; border: 1px solid var(--borde); border-radius: 7px; background: #fff; outline: none; font: inherit; color: inherit; min-height: 36px; }
+.rejilla-condiciones { display: grid; grid-template-columns: 1fr 130px 1fr; gap: 12px; align-items: start; }
+.rejilla-condiciones input { height: 38px; }
+.rejilla-condiciones .campo { margin: 6px 0; }
+.tip { position: relative; }
+.con-ayuda { cursor: help; }
+.i-ayuda { margin-left: 3px; font-size: 10.5px; color: #b8a58f; font-weight: 400; vertical-align: 1px; }
+.con-ayuda:hover .i-ayuda { color: var(--acento); }
+.calc-valor { cursor: help; border-bottom: 1px dotted #c9b79f; }
+.calc-valor:hover { border-bottom-color: var(--acento); background: #fff5e6; }
+.tip-caja { position: fixed; z-index: 300; background: #fffdf9; border: 1px solid #e3cfb3; border-radius: 10px; box-shadow: 0 12px 32px rgba(74, 35, 18, .25);
+  padding: 11px 14px; font-size: 12.5px; font-weight: 400; color: var(--texto); text-align: left; white-space: normal; line-height: 1.45; text-transform: none; letter-spacing: 0; pointer-events: none; }
+.tip-titulo { font-weight: 700; font-size: 13px; margin-bottom: 4px; color: #6a321a; }
+.tip-texto { margin: 2px 0 6px; }
+.tip-formula { background: #f6ebdb; border-radius: 7px; padding: 7px 10px; font-family: Consolas, 'Courier New', monospace; font-size: 12px; margin: 6px 0; }
+.tip-nota { margin: 6px 0 0; color: var(--suave); font-size: 11.5px; }
+table.desarrollo { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+table.desarrollo td { padding: 2px 4px; vertical-align: top; border: none; white-space: normal; }
+table.desarrollo .paso-lhs { color: var(--suave); white-space: nowrap; text-align: right; padding-right: 8px; }
+table.desarrollo .paso-rhs { font-family: Consolas, 'Courier New', monospace; font-size: 12px; }
+table.desarrollo .paso-texto { color: #8a5a00; font-size: 12px; padding-top: 4px; }
+.tabla td.celda-usada { background: #e5f4dc; font-weight: 650; }

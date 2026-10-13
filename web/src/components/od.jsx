@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react'
 import { Campo, Check, Modal, Select } from './ui.jsx'
 import { Grilla, columnasBase } from './grilla.jsx'
+import { Ayuda, Calc } from './tip.jsx'
+import { dCociente, dCV, dDE, dODCorr, dUFC } from '../desarrollos.js'
 import { GraficoTiempo, etiquetaDil } from './datos.jsx'
 import { importarArchivo } from './importar.js'
 import { etiquetaK, linealidadOD, odCorregida, odDeFila, resumenPorTiempo, ventanaLineal } from '../calibracion.js'
-import { etiquetaGrupo, filaEnUso, tNum } from '../modelo.js'
+import { claveGrupo, etiquetaGrupo, filaEnUso, tNorm, tNum } from '../modelo.js'
 import { calcularFila, cient, sup, textoResultado } from '../ufc.js'
 import { finito } from '../estadistica.js'
 import { paletaMuestras } from '../utils.js'
@@ -15,7 +17,6 @@ export const ondaDe = (o) => (o.onda === 'otra' ? o.ondaOtra || '?' : o.onda)
 
 export function ODTab({ s }) {
   const { filas, M, opts: o } = s
-  const [info, setInfo] = useState(false)
   const archivoRef = useRef()
   const u = o.unidadTiempo || 'h'
   const lin = ventanaLineal(o)
@@ -30,7 +31,7 @@ export function ODTab({ s }) {
     ...columnasBase(s),
     ...Array.from({ length: M }, (_, k) => ({
       id: 'l' + k, titulo: etiquetaDil(k), sub: k ? `OD · 10${sup(-k)}` : 'OD', estilo: { minWidth: 66 },
-      ayuda: k ? `OD leída en la dilución 10⁻${k} (la misma que se sembró en esa columna de Datos)` : 'OD de la suspensión sin diluir',
+      ayuda: k ? `OD leída en la dilución 10⁻${k} (la misma que se sembró en esa columna de la pestaña C)` : 'OD de la suspensión sin diluir',
       get: (f) => f.od.lecturas[k] ?? '', set: setLectura(k),
       clase: (f) => {
         const t = String(f.od.lecturas[k] ?? '').trim()
@@ -54,7 +55,6 @@ export function ODTab({ s }) {
     s.setFilas(filas.map((f) => ({ ...f, od: { ...f.od, lecturas: f.od.lecturas.slice(0, M - 1) } })))
     s.setM(M - 1)
   }
-  const setOrigen = (m, v) => s.setOpt('origenOD', { ...o.origenOD, [m]: v })
   const leer = async (file) => { try { await importarArchivo(file, s, 'agregar') } catch (e) { s.avisar(e.message, 'error') } }
 
   const colores = paletaMuestras(s.corr.muestras)
@@ -67,6 +67,26 @@ export function ODTab({ s }) {
   }).filter(Boolean)
   const medias = resumenPorTiempo(filas, o, s.curva).filter((p) => p.nOD).map((p) => ({ muestra: p.muestra, t: p.t, etiqueta: p.etiqueta, y: p.od, err: p.nOD > 1 ? [p.od - p.odDe, p.od + p.odDe] : null }))
   const linOD = linealidadOD(filas, o)
+  // resumen por cepa y tiempo: OD neta media de cada dilución y OD corregida (media ± DE)
+  const resumenOD = (() => {
+    const en = filas.filter(filaEnUso)
+    const grupos = [...new Set(en.map((f) => claveGrupo(f.muestra, f.tiempo)))]
+    return grupos.map((gk) => {
+      const fs = en.filter((f) => claveGrupo(f.muestra, f.tiempo) === gk)
+      const ocs = fs.map((f) => odCorregida(f, o))
+      const corrs = ocs.map((x) => x.od).filter(finito)
+      const porDil = Array.from({ length: M }, (_, k) => {
+        const vals = fs.map((f) => odDeFila(f, o).porDil.find((x) => x.k === k)?.od).filter(finito)
+        return { vals, media: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : NaN, usada: ocs.some((x) => x.dils.includes(k) && !x.fuera) }
+      })
+      const od = corrs.length ? corrs.reduce((a, b) => a + b, 0) / corrs.length : NaN
+      const de = corrs.length > 1 ? Math.sqrt(corrs.reduce((a, b) => a + (b - od) ** 2, 0) / (corrs.length - 1)) : NaN
+      return { grupo: gk, muestra: fs[0].muestra, tiempo: tNorm(fs[0].tiempo), t: tNum(fs[0].tiempo), n: corrs.length, porDil, od, de, corrs, fuera: ocs.some((x) => x.fuera) }
+    }).filter((g) => g.porDil.some((d) => d.vals.length)).sort((a, b) => {
+      const ma = en.findIndex((f) => f.muestra === a.muestra), mb = en.findIndex((f) => f.muestra === b.muestra)
+      return ma !== mb ? ma - mb : (finito(a.t) ? a.t : Infinity) - (finito(b.t) ? b.t : Infinity)
+    })
+  })()
 
   return (
     <div className="pagina" style={{ maxWidth: 'none' }}>
@@ -74,7 +94,6 @@ export function ODTab({ s }) {
         <div className="titulo-fila">
           <h2>OD · densidad óptica</h2>
           <div className="fila-ctrl" style={{ margin: 0 }}>
-            <button onClick={() => setInfo(true)}>¿Misma suspensión o cultivo paralelo?</button>
             <button className="primario" onClick={() => archivoRef.current.click()}>Cargar OD desde Excel</button>
             <input ref={archivoRef} type="file" hidden accept=".xlsx,.csv,.txt,.tsv" onChange={(e) => { e.target.files[0] && leer(e.target.files[0]); e.target.value = '' }} />
           </div>
@@ -106,7 +125,7 @@ export function ODTab({ s }) {
           )}
         </div>
         <p className="ayuda" style={{ marginTop: 0 }}>
-          Las filas son las mismas que en Datos (muestra, tiempo y réplica) y las columnas son las mismas diluciones: en cada una va la OD leída en esa dilución de la serie
+          Las filas son las mismas que en la pestaña C (muestra, tiempo y réplica) y las columnas son las mismas diluciones: en cada una va la OD leída en esa dilución de la serie
           (vacío = no se leyó). Cada lectura es un punto de la curva: su UFC/mL es la de la muestra ÷ 10ᵏ.
           {o.blancoCorregido ? '' : ' OD neta = lectura − blanco (el de la fila o, si está vacío, el general).'}
           {' '}<b>OD corregida</b> = las lecturas que caen en la ventana lineal ({lin[0]}–{lin[1]}), multiplicadas por su dilución (OD × 10ᵏ) y promediadas: es la OD de la muestra sin diluir
@@ -117,44 +136,41 @@ export function ODTab({ s }) {
         <Grilla s={s} columnas={columnas}
           cabExtra={<><button className="mas" title="Agregar otra lectura" onClick={agregarLectura}>+</button>{' '}
             <button className="mini" title="Quitar la última lectura" onClick={quitarLectura} disabled={M <= 1}>−</button></>}
-          cabResultados={['OD corregida', 'OD ÷ OD siguiente (esperado 10)', 'Origen de la OD (por muestra)', 'UFC/mL']}
+          cabResultados={[<Ayuda key="a" clave="odCorr">OD corregida</Ayuda>, <Ayuda key="b" clave="cociente">OD ÷ OD siguiente</Ayuda>, <Ayuda key="c" clave="ufc">UFC/mL</Ayuda>]}
           resultados={(f) => {
             const d = odDeFila(f, o)
             const rc = calcularFila(f, o)
             const coc = []
             for (let i = 1; i < d.porDil.length; i++) {
               const a = d.porDil[i - 1], b = d.porDil[i]
-              if (b.k === a.k + 1 && a.od > 0 && b.od > 0) coc.push(a.od / b.od)
+              if (b.k === a.k + 1 && a.od > 0 && b.od > 0) coc.push([a, b])
             }
             const altos = d.porDil.filter((x) => x.od > 1).length
             const oc = odCorregida(f, o)
             return <>
-              <td className="res" title={oc.dils.length ? `Lecturas usadas: ${oc.dils.map(etiquetaK).join(', ')}${oc.fuera ? ' (ninguna dentro de la ventana: se usó la más cercana)' : ''}` : ''}>
-                {finito(oc.od) ? <b style={oc.fuera ? { color: '#8a5a00' } : {}}>{oc.od < 10 ? oc.od.toFixed(3) : oc.od.toFixed(1)}{oc.fuera ? ' ⚠' : ''}</b> : '–'}
+              <td className="res">
+                {finito(oc.od) ? <Calc d={dODCorr(oc, o, lin)}><b style={oc.fuera ? { color: '#8a5a00' } : {}}>{oc.od < 10 ? oc.od.toFixed(3) : oc.od.toFixed(1)}{oc.fuera ? ' ⚠' : ''}</b></Calc> : '–'}
               </td>
-              <td className="res" title="Cociente entre la OD de una dilución y la de la siguiente. En el rango lineal es ≈ 10; menor indica saturación o lecturas cerca del límite de detección.">
-                {coc.length ? coc.map((x, i) => <span key={i} style={{ color: x < 8 || x > 12.5 ? '#8e2a1c' : undefined, fontWeight: x < 8 || x > 12.5 ? 650 : undefined }}>{i ? ' · ' : ''}×{x.toFixed(1)}</span>) : '–'}
+              <td className="res">
+                {coc.length ? coc.map(([a, b], i) => {
+                  const x = a.od / b.od
+                  return <span key={i} style={{ color: x < 8 || x > 12.5 ? '#8e2a1c' : undefined, fontWeight: x < 8 || x > 12.5 ? 650 : undefined }}>{i ? ' · ' : ''}<Calc d={dCociente(a, b)}>×{x.toFixed(1)}</Calc></span>
+                }) : '–'}
                 {altos > 0 && <span style={{ color: '#8e2a1c' }} title="OD > 1: probablemente fuera del rango lineal"> ⚠</span>}
               </td>
-              <td>
-                <select value={o.origenOD?.[f.muestra] || 'misma'} onChange={(e) => setOrigen(f.muestra, e.target.value)} style={{ border: 'none', background: 'transparent', padding: '4px 6px' }}>
-                  <option value="misma">Misma suspensión sembrada</option>
-                  <option value="paralelo">Cultivo paralelo</option>
-                </select>
-              </td>
-              <td className="res">{textoResultado({ ...rc, N: rc.Nmadre })}</td>
+              <td className="res"><Calc d={dUFC(rc)}>{textoResultado({ ...rc, N: rc.Nmadre })}</Calc></td>
             </>
           }}
-          acciones={(f) => <button className="mini" title="Quitar fila (también en Datos)" onClick={() => {
-            if (filaEnUso(f) && !window.confirm('¿Quitar esta fila? También se quita de Datos con sus recuentos.')) return
+          acciones={(f) => <button className="mini" title="Quitar fila (también en la pestaña C)" onClick={() => {
+            if (filaEnUso(f) && !window.confirm('¿Quitar esta fila? También se quita de la pestaña C con sus recuentos.')) return
             s.setFilas(filas.filter((x) => x.id !== f.id))
           }}>×</button>} />
       </section>
 
-      {s.corr.prom.length > 0 && (
+      {resumenOD.length > 0 && (
         <div className="rejilla-2">
           <section className="tarjeta">
-            <h2>OD por muestra, tiempo y dilución</h2>
+            <h2>OD por cepa y tiempo</h2>
             {linOD.nFilas > 0 && (
               <p className={linOD.factor >= 8.5 && linOD.factor <= 11.5 ? 'nota' : 'aviso-sel'} style={{ marginTop: 0 }}>
                 Linealidad: la OD baja en promedio <b>×{linOD.factor.toFixed(1)}</b> por dilución (esperado ×10; {linOD.nFilas} {linOD.nFilas === 1 ? 'serie' : 'series'} con 2 o más lecturas &gt; 0,02).
@@ -162,23 +178,28 @@ export function ODTab({ s }) {
             )}
             <div className="tabla-scroll">
               <table className="tabla">
-                <thead><tr><th>Muestra</th><th>Tiempo ({u})</th><th>Dilución</th><th>n</th><th>OD media</th><th>DE</th><th>CV %</th><th>UFC/mL de la dilución</th></tr></thead>
+                <thead><tr>
+                  <th>Cepa</th><th>Tiempo ({u})</th><th><Ayuda clave="n">n</Ayuda></th>
+                  {Array.from({ length: M }, (_, k) => <th key={k}><Ayuda clave="odNeta">{k === 0 ? 'Sin diluir' : `−${k}`}</Ayuda></th>)}
+                  <th><Ayuda clave="odCorr">OD corregida</Ayuda></th><th><Ayuda clave="cv">CV %</Ayuda></th>
+                </tr></thead>
                 <tbody>
-                  {s.corr.prom.map((p) => (
-                    <tr key={p.id}>
-                      <td><i className="punto-placa" style={{ background: colores[p.muestra] }} /> <b>{p.muestra || '(sin nombre)'}</b></td>
-                      <td>{p.tiempo || '–'}</td>
-                      <td>{etiquetaK(p.k)}</td>
-                      <td>{p.nOD}</td>
-                      <td>{finito(p.x) ? p.x.toFixed(3) : '–'}</td>
-                      <td>{finito(p.xde) ? p.xde.toFixed(3) : '–'}</td>
-                      <td>{finito(p.xde) && p.x ? (100 * p.xde / p.x).toFixed(1) : '–'}</td>
-                      <td>{p.nUFC ? cient(p.y) : '–'}</td>
+                  {resumenOD.map((g) => (
+                    <tr key={g.grupo}>
+                      <td><i className="punto-placa" style={{ background: colores[g.muestra] }} /> <b>{g.muestra || '(sin nombre)'}</b></td>
+                      <td>{g.tiempo || '–'}</td>
+                      <td>{g.n}</td>
+                      {g.porDil.map((d, k) => (
+                        <td key={k} className={d.usada ? 'celda-usada' : ''}>{finito(d.media) ? <Calc d={dDE(d.vals, `OD neta media (${k === 0 ? 'sin diluir' : '−' + k})`, 3)}>{d.media.toFixed(3)}</Calc> : '–'}</td>
+                      ))}
+                      <td>{finito(g.od) ? <Calc d={g.corrs.length > 1 ? dDE(g.corrs, 'OD corregida: media ± DE de las réplicas', 3) : null}><b>{g.od.toFixed(3)}</b>{finito(g.de) ? ` ± ${g.de.toFixed(3)}` : ''}</Calc> : '–'}{g.fuera ? ' ⚠' : ''}</td>
+                      <td>{g.corrs.length > 1 ? <Calc d={dCV(g.corrs)}>{(100 * g.de / g.od).toFixed(1)}</Calc> : '–'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <p className="nota">Media de la OD neta de las réplicas en cada dilución; en verde las diluciones que entran en la OD corregida (dentro de la ventana {lin[0]}–{lin[1]}). OD corregida: media ± DE entre réplicas. Pasá el mouse sobre un número para ver el cálculo.</p>
           </section>
           <section className="tarjeta">
             <h2>OD corregida {medias.some((m) => finito(m.t)) ? 'en el tiempo' : 'por muestra'}</h2>
@@ -187,22 +208,6 @@ export function ODTab({ s }) {
         </div>
       )}
 
-      {info && (
-        <Modal titulo="¿La OD es de la misma suspensión que se sembró?" ancho={680} onClose={() => setInfo(false)}
-          pie={<button className="primario" onClick={() => setInfo(false)}>Entendido</button>}>
-          <p><b>Sí afecta el procesamiento</b>, por eso se puede indicar para cada muestra.</p>
-          <h4>Misma suspensión (emparejada)</h4>
-          <p>La OD se leyó en el mismo tubo del que se sacó la alícuota para las diluciones y la siembra. Cada réplica aporta un par (OD, UFC/mL) real:
-            la OD y las UFC de esa réplica describen la misma población de células. Se puede usar cada réplica como un punto de la curva
-            (modo <i>individual</i>), y la dispersión alrededor de la curva refleja el error de medición de la relación OD↔UFC.</p>
-          <h4>Cultivo paralelo (independiente)</h4>
-          <p>La OD se leyó en otro tubo preparado en las mismas condiciones. La réplica 1 de OD y la réplica 1 de UFC <b>no son el mismo cultivo</b>:
-            emparejarlas sería arbitrario. Lo correcto es comparar el <b>promedio</b> de OD con el <b>promedio</b> de UFC de esa muestra en ese tiempo;
-            por eso, en modo individual, estas muestras aportan un único punto por tiempo.</p>
-          <p>Además, la diferencia entre cultivos se suma al error: la curva tendrá más dispersión y la predicción será menos precisa.</p>
-          <p className="ayuda">En modo <i>promedio</i> no hay diferencia: todos los grupos entran como OD media vs. UFC media (media geométrica).</p>
-        </Modal>
-      )}
     </div>
   )
 }

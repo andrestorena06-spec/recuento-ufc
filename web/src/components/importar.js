@@ -13,7 +13,7 @@ export function fusionar(leidas, s, modo = 'agregar') {
     od: { ...f.od, lecturas: Array.from({ length: M }, (_, i) => f.od.lecturas[i] ?? '') },
   })
   const filas = (modo === 'reemplazar' ? [] : s.filas.filter(filaEnUso)).map(ajustar)
-  const origen = { ...(modo === 'reemplazar' ? {} : s.opts.origenOD) }
+  let origen = null
   let nuevas = 0, actualizadas = 0
   // primero las tablas con recuentos (crean filas), después las que solo traen OD
   const orden = [...leidas.filter((l) => l.tieneUFC), ...leidas.filter((l) => !l.tieneUFC)]
@@ -34,7 +34,7 @@ export function fusionar(leidas, s, modo = 'agregar') {
       if (x.od.blanco !== undefined) f.od.blanco = x.od.blanco
     }
     filas[i] = f
-    if (x.origen) origen[x.muestra] = x.origen
+    if (x.origen) origen = x.origen
   }))
   // las réplicas traídas por la tabla se respetan; si la tabla no las traía se numeran por orden
   s.setK(K)
@@ -42,7 +42,7 @@ export function fusionar(leidas, s, modo = 'agregar') {
   s.setFilas(filas)
   const conVol = leidas.some((l) => l.tieneVol)
   s.setOpts((o) => ({
-    ...o, origenOD: origen, ...(modo === 'reemplazar' ? { excluidos: [] } : {}), ...(conVol ? { volFijo: false } : {}),
+    ...o, ...(origen ? { origenGlobal: origen } : {}), ...(modo === 'reemplazar' ? { excluidos: [] } : {}), ...(conVol ? { volFijo: false } : {}),
     nombres: [...new Set([...(o.nombres || []), ...filas.map((f) => String(f.muestra).trim()).filter(Boolean)])],
   }))
   return { nuevas, actualizadas, conVol }

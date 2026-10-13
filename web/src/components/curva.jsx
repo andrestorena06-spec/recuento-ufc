@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { Campo, Check, Select } from './ui.jsx'
 import { PanelGrafico } from './panelGrafico.jsx'
 import { ModoSel, PuntosSel } from './tabla.jsx'
+import { Ayuda, BotonTip, Calc, Et } from './tip.jsx'
+import { dPrediccion } from '../desarrollos.js'
 import { ondaDe } from './od.jsx'
 import { etiquetaK, interpretar, MODELOS, odParaUFC } from '../calibracion.js'
 import { ejeUFC, OPCIONES_EJE_UFC } from '../modelo.js'
@@ -112,26 +114,28 @@ export function CurvaTab({ s }) {
     <div className="con-lateral">
       <aside className="lateral">
         <h2>Curva de calibración</h2>
-        <Campo label="OD de cada punto"><PuntosSel s={s} /></Campo>
-        <Campo label="Réplicas"><ModoSel s={s} /></Campo>
+        <Campo label={<Et texto="OD de cada punto" ayuda="Qué OD se usa en el eje X. «OD corregida»: un punto por réplica con la OD de la muestra (lecturas dentro de la ventana lineal × 10ᵏ). «Por dilución»: cada lectura de OD es un punto con la UFC/mL de esa dilución." />}><PuntosSel s={s} /></Campo>
+        <Campo label={<Et texto="Réplicas" ayuda="«Réplicas individuales»: cada réplica es un punto. «Promedio por muestra»: un punto por cepa y tiempo (OD media frente a la media geométrica de UFC/mL), con barras de ± 1 DE." />}><ModoSel s={s} /></Campo>
         {cepas.length > 1 && (
-          <Campo label={`Curva (${cepas.length} cepas)`}>
+          <Campo label={<Et texto={`Curva (${cepas.length} cepas)`} ayuda="Cada cepa puede tener su propia relación OD ↔ UFC (por tamaño y forma celular). La prueba F debajo del gráfico indica si las cepas difieren." />}>
             <div className="seg">
-              <button className={o.curvaPor !== 'comun' ? 'on' : ''} onClick={() => s.setOpt('curvaPor', 'cepa')}>Una por cepa</button>
-              <button className={o.curvaPor === 'comun' ? 'on' : ''} onClick={() => s.setOpt('curvaPor', 'comun')}>Común a todas</button>
+              <BotonTip className={o.curvaPor !== 'comun' ? 'on' : ''} onClick={() => s.setOpt('curvaPor', 'cepa')}
+                ayuda="Ajusta una ecuación distinta para cada cepa, cada una en su color (recomendado si la prueba F da p < 0,05).">Una por cepa</BotonTip>
+              <BotonTip className={o.curvaPor === 'comun' ? 'on' : ''} onClick={() => s.setOpt('curvaPor', 'comun')}
+                ayuda="Ajusta una sola ecuación con los puntos de todas las cepas juntas (válido si las cepas no difieren).">Común a todas</BotonTip>
             </div>
           </Campo>
         )}
         {separadas && (
-          <Campo label="Cepa del detalle (resultados, residuos, calculadora)">
+          <Campo label={<Et texto="Cepa del detalle" ayuda="Cepa cuyos resultados completos se muestran abajo: parámetros con su error, comparación de modelos, interpretación, residuos y calculadora. Las demás cepas siguen dibujadas en el gráfico." />}>
             <Select value={detalle} onChange={(v) => s.setOpt('cepaDetalle', v)} opciones={cepas.map((c) => [c, c])} />
           </Campo>
         )}
-        <Campo label="Modelo">
+        <Campo label={<Et texto="Modelo" ayuda="Forma de la relación entre OD y UFC/mL. «Clásico» (log₁₀ UFC = m·OD + b) es la recta habitual; «Proporcional» (UFC = b·OD) es la que corresponde al rango lineal del fotómetro; «Lineal», «Cuadrático» y «Log–log» sirven para comparar. La tabla «Comparación de modelos» indica cuál ajusta mejor." />}>
           <Select value={o.modelo} onChange={(v) => s.setOpt('modelo', v)} opciones={Object.entries(MODELOS).map(([k, m]) => [k, m.nombre])} />
         </Campo>
         {MODELOS[o.modelo].escala === 'lin' && (
-          <Campo label="Ponderación">
+          <Campo label={<Et texto="Ponderación" ayuda="Cuánto pesa cada punto en el ajuste. Con «error proporcional» cada punto pesa según su error relativo (recomendado, porque el error de un recuento crece con su valor). Sin ponderar, los puntos de UFC alta dominan." />}>
             <Select value={o.ponderacion} onChange={(v) => s.setOpt('ponderacion', v)}
               opciones={[['relativa', 'Error proporcional (pesos 1/UFC²)'], ['ninguna', 'Sin ponderar (mínimos cuadrados)']]} />
           </Campo>
@@ -140,18 +144,18 @@ export function CurvaTab({ s }) {
           ? (o.ponderacion === 'relativa' ? 'Recomendado: el error de un recuento es proporcional a su valor, así que cada punto pesa según su error relativo.' : 'Sin ponderar, los puntos de UFC alta dominan el ajuste.')
           : 'Ajuste por mínimos cuadrados sobre log₁₀(UFC/mL): ya supone error proporcional.'}</p>
         <div className="fila-ctrl">
-          <Campo label="Eje Y (UFC)"><Select value={o.escalaY} onChange={(v) => s.setOpt('escalaY', v)} opciones={OPCIONES_EJE_UFC} /></Campo>
-          <Campo label="Eje X"><Select value={o.escalaX} onChange={(v) => s.setOpt('escalaX', v)} opciones={[['lin', 'Lineal'], ['log', 'Log']]} /></Campo>
+          <Campo label={<Et texto="Eje Y" ayuda="Escala de UFC/mL: log₁₀ (valores 2…9, lo habitual en los papers), logarítmica con etiquetas 10ⁿ, o lineal." />}><Select value={o.escalaY} onChange={(v) => s.setOpt('escalaY', v)} opciones={OPCIONES_EJE_UFC} /></Campo>
+          <Campo label={<Et texto="Eje X" ayuda="Escala de la OD: lineal (lo habitual) o logarítmica (útil si las OD abarcan varios órdenes de magnitud)." />}><Select value={o.escalaX} onChange={(v) => s.setOpt('escalaX', v)} opciones={[['lin', 'Lineal'], ['log', 'Log']]} /></Campo>
         </div>
-        <Campo label="Color de los puntos">
-          <Select value={o.colorPor} onChange={(v) => s.setOpt('colorPor', v)} opciones={[['muestra', 'Por muestra'], ['tiempo', 'Por tiempo'], ['dilucion', 'Por dilución']]} />
+        <Campo label={<Et texto="Color de los puntos" ayuda="Colorea los puntos por cepa, por tiempo de muestreo o por dilución leída, para ver de dónde viene cada punto." />}>
+          <Select value={o.colorPor} onChange={(v) => s.setOpt('colorPor', v)} opciones={[['muestra', 'Por cepa'], ['tiempo', 'Por tiempo'], ['dilucion', 'Por dilución']]} />
         </Campo>
-        <Check label="Ecuación y R² sobre el gráfico" checked={o.mostrarEcuacion} onChange={(v) => s.setOpt('mostrarEcuacion', v)} />
-        <Check label="Banda de confianza 95 % (de la curva)" checked={o.bandaC} onChange={(v) => s.setOpt('bandaC', v)} />
-        <Check label="Banda de predicción 95 % (de una medición nueva)" checked={o.bandaP} onChange={(v) => s.setOpt('bandaP', v)} />
-        <Check label="Barras de error en los puntos" checked={barras} onChange={setBarras}
+        <Check label={<Et texto="Ecuación y R² sobre el gráfico" ayuda="Escribe la ecuación ajustada y su R² en un recuadro dentro del gráfico (como la línea de tendencia de Excel). Sale también en la imagen descargada." />} checked={o.mostrarEcuacion} onChange={(v) => s.setOpt('mostrarEcuacion', v)} />
+        <Check label={<Et texto="Banda de confianza 95 %" ayuda="Zona sombreada donde está la curva verdadera con 95 % de confianza. Es angosta en el centro de los datos y se abre en los extremos." />} checked={o.bandaC} onChange={(v) => s.setOpt('bandaC', v)} />
+        <Check label={<Et texto="Banda de predicción 95 %" ayuda="Líneas punteadas donde caería el recuento de una muestra nueva con 95 % de probabilidad. Es la que importa para usar la curva: indica cuánto puede errar una estimación." />} checked={o.bandaP} onChange={(v) => s.setOpt('bandaP', v)} />
+        <Check label={<Et texto="Barras de error en los puntos" ayuda="En réplicas individuales: IC 95 % de Poisson de cada recuento. En promedios: ± 1 DE de la OD y del log₁₀ UFC entre réplicas." />} checked={barras} onChange={setBarras}
           ayuda={o.modo === 'promedio' ? '± 1 DE (OD y log₁₀ UFC)' : 'IC 95 % de Poisson del recuento'} />
-        <h3>Rango de tiempo del ajuste</h3>
+        <h3><Et texto="Rango de tiempo del ajuste" ayuda="Solo los puntos tomados entre estos tiempos entran en la ecuación (los demás se ven con una ✕). Lo usual es usar la fase exponencial; en Crecimiento se aplica con un clic." /></h3>
         {separadas && Object.keys(o.rangosCepa || {}).some((m) => cepas.includes(m)) && (
           <div className="aviso-sel" style={{ marginBottom: 6 }}>
             Por cepa (desde Crecimiento): {Object.entries(o.rangosCepa).filter(([m]) => cepas.includes(m)).map(([m, r]) => `${m} ${r[0]}–${r[1]} ${u}`).join(' · ')}.{' '}
@@ -164,20 +168,22 @@ export function CurvaTab({ s }) {
           <Campo label={`Hasta (${u})`}><input value={o.tMax} placeholder="sin límite" onChange={(e) => s.setOpt('tMax', e.target.value)} /></Campo>
         </div>
         <p className="nota">Lo usual es construir la ecuación solo con la fase exponencial. En la pestaña <button className="enlace" onClick={() => s.irA('crecimiento')}>Crecimiento</button> se detecta y se puede aplicar acá con un clic.</p>
-        <h3>Rango de OD del ajuste</h3>
+        <h3><Et texto="Rango de OD del ajuste" ayuda="Solo los puntos con OD entre estos valores entran en la ecuación. Sirve para quedarse con el tramo lineal." /></h3>
         <div className="fila-ctrl">
           <Campo label="OD mínima"><input value={o.odMin} placeholder="sin límite" onChange={(e) => s.setOpt('odMin', e.target.value)} /></Campo>
           <Campo label="OD máxima"><input value={o.odMax} placeholder="sin límite" onChange={(e) => s.setOpt('odMax', e.target.value)} /></Campo>
         </div>
-        <Check label="Usar recuentos estimados" checked={o.incluirEstimados} onChange={(v) => s.setOpt('incluirEstimados', v)} ayuda="Placas fuera del rango contable" />
+        <Check label={<Et texto="Usar recuentos estimados" ayuda="Incluye los recuentos de réplicas sin ninguna placa dentro del rango contable (se usó la más cercana). Son menos confiables; por defecto quedan afuera." />} checked={o.incluirEstimados} onChange={(v) => s.setOpt('incluirEstimados', v)} ayuda="Placas fuera del rango contable" />
         <p className="nota">Clic en un punto del gráfico para sacarlo o volver a ponerlo en el ajuste.</p>
-        <button className="ancho" disabled={!o.excluidos.length} onClick={() => s.setOpt('excluidos', [])}>Volver a incluir todos ({o.excluidos.length})</button>
-        <button className="ancho" onClick={exportar} disabled={!todos.length}>Descargar resultados (Excel)</button>
+        <BotonTip className="ancho" disabled={!o.excluidos.length} onClick={() => s.setOpt('excluidos', [])} titulo="Volver a incluir todos"
+          ayuda="Vuelve a poner en el ajuste los puntos que sacaste con un clic en el gráfico.">Volver a incluir todos ({o.excluidos.length})</BotonTip>
+        <BotonTip className="ancho" onClick={exportar} disabled={!todos.length} titulo="Descargar resultados"
+          ayuda="Excel con los puntos (y si entran en el ajuste), la comparación de modelos, los parámetros de la cepa del detalle y las condiciones del experimento.">Descargar resultados (Excel)</BotonTip>
         <p className="nota">{usados.length} puntos en el ajuste de {todos.length}.</p>
       </aside>
       <div className="principal">
         {!todos.length ? (
-          <div className="vacio">No hay pares OD–UFC todavía. Necesitás recuentos (pestaña <button className="enlace" onClick={() => s.irA('datos')}>Datos</button>) y lecturas de OD (pestaña <button className="enlace" onClick={() => s.irA('od')}>OD</button>) para las mismas muestras.</div>
+          <div className="vacio">No hay pares OD–UFC todavía. Necesitás recuentos (pestaña <button className="enlace" onClick={() => s.irA('datos')}>C</button>) y lecturas de OD (pestaña <button className="enlace" onClick={() => s.irA('od')}>OD</button>) para las mismas muestras.</div>
         ) : (
           <>
             <PanelGrafico estilo={s.estilos.curva} setEstilo={s.setEstilo('curva')} nombre={`curva_${o.modelo}`} alto={460}
@@ -195,14 +201,14 @@ export function CurvaTab({ s }) {
                 <h3>Comparación de modelos{separadas ? ` · ${detalle}` : ''}</h3>
                 <div className="tabla-scroll chica">
                   <table className="tabla">
-                    <thead><tr><th>Modelo</th><th>n</th><th>R² (propia escala)</th><th>RMSE log₁₀</th><th>Error relativo medio</th><th>AICc</th><th>ΔAICc</th><th /></tr></thead>
+                    <thead><tr><th>Modelo</th><th><Ayuda clave="n">n</Ayuda></th><th><Ayuda clave="r2">R² (propia escala)</Ayuda></th><th><Ayuda clave="rmse">RMSE log₁₀</Ayuda></th><th><Ayuda clave="errRel">Error relativo medio</Ayuda></th><th><Ayuda clave="aicc">AICc</Ayuda></th><th><Ayuda clave="aicc">ΔAICc</Ayuda></th><th /></tr></thead>
                     <tbody>
                       {comparacion.map(([m, a]) => (
                         <tr key={m} className={m === o.modelo ? 'fila-activa' : ''}>
                           <td><b>{MODELOS[m].corto}</b></td><td>{a.f.n}</td><td>{a.f.r2.toFixed(4)}</td><td>{a.rmseLog.toFixed(3)}</td>
                           <td>{a.mape.toFixed(1)} %</td><td>{finito(a.aicc) ? a.aicc.toFixed(1) : '–'}</td>
                           <td>{finito(a.aicc) ? (a.aicc - mejorAic).toFixed(1) : '–'}{a.aicc === mejorAic ? ' ★' : ''}</td>
-                          <td>{m !== o.modelo && <button className="chico" onClick={() => s.setOpt('modelo', m)}>Usar</button>}</td>
+                          <td>{m !== o.modelo && <BotonTip className="chico" onClick={() => s.setOpt('modelo', m)} titulo={`Usar ${MODELOS[m].corto}`} ayuda="Cambia el modelo de la curva a este (para todas las cepas).">Usar</BotonTip>}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -230,7 +236,7 @@ function Resultados({ aj, s, cepa }) {
       <div className="ecuacion">{M.ecuacion(f.beta)}</div>
       <div className="tabla-scroll chica">
         <table className="tabla">
-          <thead><tr><th>Parámetro</th><th>Estimación</th><th>Error estándar</th><th>IC 95 %</th><th>t</th><th>p</th></tr></thead>
+          <thead><tr><th>Parámetro</th><th><Ayuda clave="estimacion">Estimación</Ayuda></th><th><Ayuda clave="ee">Error estándar</Ayuda></th><th><Ayuda clave="ee">IC 95 %</Ayuda></th><th><Ayuda clave="pvalor">t</Ayuda></th><th><Ayuda clave="pvalor">p</Ayuda></th></tr></thead>
           <tbody>
             {M.params.map((nm, i) => (
               <tr key={nm}><td>{nm}</td><td><b>{num(f.beta[i])}</b></td><td>{num(f.se[i])}</td><td>{num(f.ic[i][0])} a {num(f.ic[i][1])}</td><td>{f.t[i].toFixed(2)}</td><td>{fmtP(f.p[i]).replace('= ', '')}</td></tr>
@@ -303,7 +309,7 @@ function Calculadora({ aj, xmin, xmax, onda, corregida, cepa }) {
           </div>
           {b && finito(F) ? (
             <>
-              <div className="res-calc">{cient(b.y * F)} UFC/mL</div>
+              <div className="res-calc"><Calc d={dPrediccion(aj, x, Fl, corregida, xLeida)}>{cient(b.y * F)} UFC/mL</Calc></div>
               <p className="nota">IC 95 % de la media: {cient(Math.max(0, b.c[0]) * F, 1)} – {cient(b.c[1] * F, 1)}<br />
                 Predicción 95 % (una muestra nueva): {cient(Math.max(0, b.p[0]) * F, 1)} – {cient(b.p[1] * F, 1)}
                 {Fl !== 1 && (corregida ? <><br />OD corregida usada: {xLeida} × {Fl} = {x.toFixed(3)}.</> : <><br />Ya multiplicado por {Fl} (la dilución en que se leyó).</>)}</p>
@@ -335,7 +341,7 @@ function CurvasPorCepa({ s, porCepa, cmp, colM, separadas }) {
       <h3 className="normal">Curva de cada cepa</h3>
       <div className="tabla-scroll chica">
         <table className="tabla">
-          <thead><tr><th>Cepa</th><th>n</th><th>Ecuación ({MODELOS[o.modelo].corto})</th><th>R²</th><th>Rango de OD</th><th /></tr></thead>
+          <thead><tr><th>Cepa</th><th><Ayuda clave="n">n</Ayuda></th><th><Ayuda clave="ecuacion">Ecuación ({MODELOS[o.modelo].corto})</Ayuda></th><th><Ayuda clave="r2">R²</Ayuda></th><th><Ayuda clave="rangoOD">Rango de OD</Ayuda></th><th /></tr></thead>
           <tbody>
             {porCepa.map((c) => (
               <tr key={c.muestra} className={separadas && c.muestra === s.curva.detalle ? 'fila-activa' : ''}>
@@ -346,7 +352,7 @@ function CurvasPorCepa({ s, porCepa, cmp, colM, separadas }) {
                   <td>{c.aj.f.r2.toFixed(4)}</td>
                   <td>{c.xmin.toFixed(3)} – {c.xmax.toFixed(3)}</td>
                 </> : <td colSpan={3} className="ayuda">{c.error}</td>}
-                <td>{separadas && c.aj && c.muestra !== s.curva.detalle && <button className="chico" onClick={() => s.setOpt('cepaDetalle', c.muestra)}>Ver detalle</button>}</td>
+                <td>{separadas && c.aj && c.muestra !== s.curva.detalle && <BotonTip className="chico" onClick={() => s.setOpt('cepaDetalle', c.muestra)} titulo="Ver detalle" ayuda="Muestra abajo los parámetros, residuos y calculadora de esta cepa.">Ver detalle</BotonTip>}</td>
               </tr>
             ))}
           </tbody>
