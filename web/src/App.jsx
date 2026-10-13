@@ -14,7 +14,7 @@ import { CrecimientoTab } from './components/crecimiento.jsx'
 const CLAVE = 'recuento-ufc-v1'
 const PESTANAS = [
   ['archivo', 'Archivo', 'Sesión y plantilla'],
-  ['datos', 'Datos', 'Recuento de colonias'],
+  ['datos', 'C', 'Recuento de colonias'],
   ['od', 'OD', 'Densidad óptica'],
   ['crecimiento', 'Crecimiento', 'Curva en el tiempo'],
   ['tabla', 'Tabla', 'UFC/mL ↔ OD'],

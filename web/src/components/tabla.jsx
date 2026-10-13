@@ -5,6 +5,9 @@ import { finito } from '../estadistica.js'
 import { excelDe, hojaCondiciones } from '../excel.js'
 import { descargarBlob } from '../utils.js'
 import { ondaDe } from './od.jsx'
+import { Ayuda, BotonTip, Calc } from './tip.jsx'
+import { claveColumna } from '../ayudas.js'
+import { dDE, dMediaGeo } from '../desarrollos.js'
 
 const r4 = (x, d = 4) => (finito(x) ? Number(x.toFixed(d)) : null)
 const r3s = (x) => (finito(x) ? Number(x.toPrecision(4)) : null)
@@ -12,8 +15,10 @@ const r3s = (x) => (finito(x) ? Number(x.toPrecision(4)) : null)
 export function ModoSel({ s }) {
   return (
     <div className="seg">
-      <button className={s.opts.modo === 'individual' ? 'on' : ''} onClick={() => s.setOpt('modo', 'individual')}>Réplicas individuales</button>
-      <button className={s.opts.modo === 'promedio' ? 'on' : ''} onClick={() => s.setOpt('modo', 'promedio')}>Promedio por muestra</button>
+      <BotonTip className={s.opts.modo === 'individual' ? 'on' : ''} onClick={() => s.setOpt('modo', 'individual')}
+        ayuda="Cada réplica es un punto (si la OD es de un cultivo paralelo, cada cepa y tiempo aporta su promedio).">Réplicas individuales</BotonTip>
+      <BotonTip className={s.opts.modo === 'promedio' ? 'on' : ''} onClick={() => s.setOpt('modo', 'promedio')}
+        ayuda="Un punto por cepa y tiempo: OD media frente a la media geométrica de UFC/mL de sus réplicas.">Promedio por cepa</BotonTip>
     </div>
   )
 }
@@ -21,10 +26,10 @@ export function ModoSel({ s }) {
 export function PuntosSel({ s }) {
   return (
     <div className="seg">
-      <button className={s.opts.puntos !== 'dilucion' ? 'on' : ''} title="Un punto por réplica: OD corregida (lecturas dentro de la ventana lineal × 10ᵏ) frente a UFC/mL de la muestra"
-        onClick={() => s.setOpt('puntos', 'corregida')}>OD corregida</button>
-      <button className={s.opts.puntos === 'dilucion' ? 'on' : ''} title="Cada lectura es un punto: OD de la dilución frente a UFC/mL de esa dilución"
-        onClick={() => s.setOpt('puntos', 'dilucion')}>Por dilución</button>
+      <BotonTip className={s.opts.puntos !== 'dilucion' ? 'on' : ''} onClick={() => s.setOpt('puntos', 'corregida')}
+        ayuda="Un punto por réplica: OD corregida (lecturas dentro de la ventana lineal × 10ᵏ) frente a la UFC/mL de la muestra. Es lo que se reporta.">OD corregida</BotonTip>
+      <BotonTip className={s.opts.puntos === 'dilucion' ? 'on' : ''} onClick={() => s.setOpt('puntos', 'dilucion')}
+        ayuda="Cada lectura de OD es un punto, frente a la UFC/mL de esa dilución (muestra ÷ 10ᵏ). Sirve para ver dónde se pierde la linealidad.">Por dilución</BotonTip>
     </div>
   )
 }
@@ -117,12 +122,12 @@ export function TablaTab({ s }) {
             ? 'En modo promedio, para cada muestra y tiempo, la OD es la media aritmética y la UFC/mL la media geométrica de las réplicas válidas.'
             : 'En modo individual cada réplica es un punto; las muestras con OD de cultivo paralelo entran con sus promedios.'}
         </p>
-        {!filas.length ? <div className="vacio">Sin datos: cargá recuentos en Datos y lecturas en OD.</div> : (
+        {!filas.length ? <div className="vacio">Sin datos: cargá recuentos en la pestaña C y lecturas en OD.</div> : (
           <div className="tabla-scroll" style={{ maxHeight: 560 }}>
             <table className="tabla">
               <thead><tr>{columnas.map((col) => (
                 <th key={col} style={{ cursor: 'pointer' }} onClick={() => setOrden(orden?.col === col ? (orden.dir === 'asc' ? { col, dir: 'desc' } : null) : { col, dir: 'asc' })}>
-                  {col}{orden?.col === col ? (orden.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>
+                  {claveColumna(col) ? <Ayuda clave={claveColumna(col)}>{col}</Ayuda> : col}{orden?.col === col ? (orden.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>
               ))}</tr></thead>
               <tbody>
                 {vista.map((f, i) => (
@@ -168,15 +173,15 @@ function ResumenTiempo({ s, filas, onda, u }) {
       </div>
       <div className="tabla-scroll">
         <table className="tabla">
-          <thead><tr><th>Muestra</th><th>Tiempo ({u})</th><th>OD corregida</th><th>UFC/mL</th><th>log₁₀ UFC/mL</th><th>Estimada por curva</th></tr></thead>
+          <thead><tr><th>Cepa</th><th>Tiempo ({u})</th><th><Ayuda clave="odCorr">OD corregida</Ayuda></th><th><Ayuda clave="mediaGeo">UFC/mL</Ayuda></th><th><Ayuda clave="logDe">log₁₀ UFC/mL</Ayuda></th><th><Ayuda clave="prediccion">Estimada por curva</Ayuda></th></tr></thead>
           <tbody>
             {filas.map((f) => (
               <tr key={f.grupo}>
                 <td><b>{f.muestra || '(sin nombre)'}</b></td>
                 <td>{f.tiempo || '–'}</td>
-                <td>{finito(f.od) ? `${f.od.toFixed(3)}${finito(f.odDe) ? ' ± ' + f.odDe.toFixed(3) : ''}` : '–'}{f.fueraVentana ? ' ⚠' : ''} <small className="ayuda">{f.nOD ? `n = ${f.nOD}` : ''}</small></td>
-                <td>{f.nUFC ? cient(f.geo) : '–'} <small className="ayuda">{f.nUFC ? `n = ${f.nUFC}` : ''}</small></td>
-                <td>{f.nUFC ? `${f.logMedia.toFixed(2)}${finito(f.logDe) ? ' ± ' + f.logDe.toFixed(2) : ''}` : '–'}</td>
+                <td>{finito(f.od) ? <Calc d={f.ods?.length > 1 ? dDE(f.ods, 'OD corregida: media ± DE de las réplicas', 3) : null}>{f.od.toFixed(3)}{finito(f.odDe) ? ' ± ' + f.odDe.toFixed(3) : ''}</Calc> : '–'}{f.fueraVentana ? ' ⚠' : ''} <small className="ayuda">{f.nOD ? `n = ${f.nOD}` : ''}</small></td>
+                <td>{f.nUFC ? <Calc d={dMediaGeo(f.logs)}>{cient(f.geo)}</Calc> : '–'} <small className="ayuda">{f.nUFC ? `n = ${f.nUFC}` : ''}</small></td>
+                <td>{f.nUFC ? <Calc d={f.nUFC > 1 ? dDE(f.logs, 'Media y DE de log₁₀ UFC/mL', 3) : null}>{f.logMedia.toFixed(2)}{finito(f.logDe) ? ' ± ' + f.logDe.toFixed(2) : ''}</Calc> : '–'}</td>
                 <td>{f.pred ? <>≈ {cient(f.pred.y)}{f.pred.extrapola ? ' ⚠' : ''}</> : ''}</td>
               </tr>
             ))}
@@ -203,7 +208,7 @@ function Predicciones({ s, preds, onda, u }) {
       </div>
       <div className="tabla-scroll chica">
         <table className="tabla">
-          <thead><tr><th>Muestra</th><th>Tiempo ({u})</th><th>Rép.</th><th>OD{onda} usada</th><th>UFC/mL estimada</th><th>Predicción 95 %</th><th /></tr></thead>
+          <thead><tr><th>Cepa</th><th>Tiempo ({u})</th><th>Rép.</th><th><Ayuda clave="odCorr">OD{onda} usada</Ayuda></th><th><Ayuda clave="prediccion">UFC/mL estimada</Ayuda></th><th>Predicción 95 %</th><th /></tr></thead>
           <tbody>
             {preds.map((x) => (
               <tr key={x.fila.id}>

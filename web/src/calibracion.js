@@ -77,7 +77,7 @@ export function correspondencia(filasTodas, o) {
     const base = {
       filaId: f.id, muestra: f.muestra, tiempo: tNorm(f.tiempo), t: tNum(f.tiempo), rep: f.rep,
       grupo: claveGrupo(f.muestra, f.tiempo), etiqueta: etiquetaGrupo(f.muestra, f.tiempo, u), r,
-      origen: o.origenOD?.[f.muestra] || 'misma',
+      origen: o.origenGlobal === 'paralelo' ? 'paralelo' : 'misma',
     }
     if (!d.porDil.length) { ind.push({ ...base, id: f.id + ':-', k: null, x: NaN, y: NaN, ic: [NaN, NaN], valido: false }); return }
     if (o.puntos !== 'dilucion') {
@@ -435,8 +435,8 @@ export function resumenPorTiempo(filasTodas, o, curva) {
     }
     return {
       grupo: g, muestra: fs[0].muestra, tiempo: tNorm(fs[0].tiempo), t: tNum(fs[0].tiempo), etiqueta: etiquetaGrupo(fs[0].muestra, fs[0].tiempo, u),
-      nOD: rx.n, od: rx.media, odDe: rx.de, fueraVentana: ods.some((x) => x.fuera),
-      nUFC: ry.n, logMedia: ry.media, logDe: ry.de, geo: 10 ** ry.media, pred,
+      nOD: rx.n, od: rx.media, odDe: rx.de, fueraVentana: ods.some((x) => x.fuera), ods: ods.map((x) => x.od),
+      nUFC: ry.n, logs: rs.map((r) => Math.log10(r.Nmadre)), logMedia: ry.media, logDe: ry.de, geo: 10 ** ry.media, pred,
     }
   }).sort((a, b) => {
     // por muestra (en el orden en que aparecen) y por tiempo

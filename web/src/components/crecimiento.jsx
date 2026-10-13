@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Campo, Check, Select } from './ui.jsx'
 import { PanelGrafico } from './panelGrafico.jsx'
+import { Ayuda, Calc, FichaAyuda, Tip } from './tip.jsx'
+import { dDelta, dG, dLag, dMu } from '../desarrollos.js'
 import { ondaDe } from './od.jsx'
 import { predicciones, resumenPorTiempo } from '../calibracion.js'
 import { parametrosCrecimiento, seriesCrecimiento } from '../crecimiento.js'
@@ -35,7 +37,7 @@ export function CrecimientoTab({ s }) {
   })), [muestras.join('|'), series])
 
   if (!muestras.length) {
-    return <div className="vacio">Para ver el crecimiento hacen falta muestras con <b>tiempos numéricos</b> (columna Tiempo en Datos) y recuentos u OD.</div>
+    return <div className="vacio">Para ver el crecimiento hacen falta muestras con <b>tiempos numéricos</b> (columna Tiempo en la pestaña C) y recuentos u OD.</div>
   }
 
   // qué eje usa cada variable: con las dos, OD a la izquierda (lineal) y UFC a la derecha
@@ -132,10 +134,10 @@ export function CrecimientoTab({ s }) {
           ejeY={verOD ? ejeOD : ejeU} ejeY2={ambos ? ejeU : null} />
 
         <section style={{ marginTop: 20 }}>
-          <h3 className="normal">Parámetros de crecimiento</h3>
+          <h3 className="normal">Parámetros de crecimiento <small className="ayuda">(pasá el mouse sobre un valor para ver el cálculo)</small></h3>
           <div className="tabla-scroll chica">
             <table className="tabla">
-              <thead><tr><th>Muestra</th><th>Variable</th><th>Fase exponencial</th><th>µ (1/{u}) · IC 95 %</th><th>Tiempo de generación</th><th>Latencia</th><th>Δ log₁₀</th><th>R²</th><th /></tr></thead>
+              <thead><tr><th>Cepa</th><th>Variable</th><th><Ayuda clave="fase">Fase exponencial</Ayuda></th><th><Ayuda clave="mu">µ (1/{u}) · IC 95 %</Ayuda></th><th><Ayuda clave="g">Tiempo de generación</Ayuda></th><th><Ayuda clave="lag">Latencia</Ayuda></th><th><Ayuda clave="deltaLog">Δ log₁₀</Ayuda></th><th><Ayuda clave="r2">R²</Ayuda></th><th /></tr></thead>
               <tbody>
                 {params.filter((p) => sel.includes(p.muestra)).map((p) => (
                   <tr key={p.muestra + p.variable}>
@@ -143,13 +145,14 @@ export function CrecimientoTab({ s }) {
                     <td>{NOMBRE_VAR[p.variable]}</td>
                     {p.error ? <td colSpan={6} className="ayuda">{p.error}</td> : <>
                       <td>{p.t1}–{p.t2} {u} <small className="ayuda">({p.nTiempos} tiempos){p.dudosa ? ' ⚠' : ''}</small></td>
-                      <td><b>{fmtT(p.mu)}</b> <small className="ayuda">{finito(p.muIc[0]) ? `${fmtT(p.muIc[0])} a ${fmtT(p.muIc[1])}` : ''}</small></td>
-                      <td>{fmtT(p.g)} {u}{u === 'h' && finito(p.g) ? <small className="ayuda"> ({(p.g * 60).toFixed(0)} min)</small> : ''}</td>
-                      <td>{fmtT(p.lag)} {u}</td>
-                      <td>{(p.zmax - p.z0).toFixed(2)} <small className="ayuda">({p.duplicaciones.toFixed(1)} duplic.)</small></td>
+                      <td><Calc d={dMu(p, u)}><b>{fmtT(p.mu)}</b> <small className="ayuda">{finito(p.muIc[0]) ? `${fmtT(p.muIc[0])} a ${fmtT(p.muIc[1])}` : ''}</small></Calc></td>
+                      <td><Calc d={dG(p, u)}>{fmtT(p.g)} {u}{u === 'h' && finito(p.g) ? <small className="ayuda"> ({(p.g * 60).toFixed(0)} min)</small> : ''}</Calc></td>
+                      <td><Calc d={dLag(p, u)}>{fmtT(p.lag)} {u}</Calc></td>
+                      <td><Calc d={dDelta(p)}>{(p.zmax - p.z0).toFixed(2)} <small className="ayuda">({p.duplicaciones.toFixed(1)} duplic.)</small></Calc></td>
                       <td>{p.r2.toFixed(3)}</td>
                     </>}
-                    <td>{!p.error && <button className="chico" title="Usar solo esta fase para la ecuación de calibración" onClick={() => usarFase(p)}>Usar en la curva</button>}</td>
+                    <td>{!p.error && <Tip contenido={<FichaAyuda titulo="Usar en la curva" texto={`Limita la ecuación de calibración ${porCepa ? `de ${p.muestra} ` : ''}a los tiempos ${p.t1}–${p.t2} ${u}, es decir, a su fase exponencial (lo recomendado).`} />} ancho={300}>
+                      <button className="chico" onClick={() => usarFase(p)}>Usar en la curva</button></Tip>}</td>
                   </tr>
                 ))}
               </tbody>
