@@ -5,9 +5,9 @@ import { Ayuda, Calc } from './tip.jsx'
 import { dCociente, dCV, dDE, dODCorr, dUFC } from '../desarrollos.js'
 import { GraficoTiempo, etiquetaDil } from './datos.jsx'
 import { importarArchivo } from './importar.js'
-import { etiquetaK, linealidadOD, odCorregida, odDeFila, resumenPorTiempo, ventanaLineal } from '../calibracion.js'
+import { etiquetaK, lineal, linealidadOD, odCorregida, odDeFila, resumenPorTiempo, ventanaLineal } from '../calibracion.js'
 import { claveGrupo, etiquetaGrupo, filaEnUso, tNorm, tNum } from '../modelo.js'
-import { calcularFila, cient, sup, textoResultado } from '../ufc.js'
+import { calcularFila, cient, factorDe, potDil, proporcion, sup, textoResultado } from '../ufc.js'
 import { finito } from '../estadistica.js'
 import { paletaMuestras } from '../utils.js'
 
@@ -20,6 +20,7 @@ export function ODTab({ s }) {
   const archivoRef = useRef()
   const u = o.unidadTiempo || 'h'
   const lin = ventanaLineal(o)
+  const Fd = factorDe(o)
 
   const setLectura = (i) => (f, v) => {
     const lecturas = [...f.od.lecturas]
@@ -30,8 +31,8 @@ export function ODTab({ s }) {
   const columnas = [
     ...columnasBase(s),
     ...Array.from({ length: M }, (_, k) => ({
-      id: 'l' + k, titulo: etiquetaDil(k), sub: k ? `OD · 10${sup(-k)}` : 'OD', estilo: { minWidth: 66 },
-      ayuda: k ? `OD leída en la dilución 10⁻${k} (la misma que se sembró en esa columna de la pestaña C)` : 'OD de la suspensión sin diluir',
+      id: 'l' + k, titulo: etiquetaDil(k), sub: k ? `OD · ${Fd === 10 ? '10' + sup(-k) : proporcion(k, Fd)}` : 'OD', estilo: { minWidth: 66 },
+      ayuda: k ? `OD leída en la dilución ${potDil(k, Fd)} (la misma que se sembró en esa columna de la pestaña C)` : 'OD de la suspensión sin diluir',
       get: (f) => f.od.lecturas[k] ?? '', set: setLectura(k),
       clase: (f) => {
         const t = String(f.od.lecturas[k] ?? '').trim()
@@ -126,10 +127,10 @@ export function ODTab({ s }) {
         </div>
         <p className="ayuda" style={{ marginTop: 0 }}>
           Las filas son las mismas que en la pestaña C (muestra, tiempo y réplica) y las columnas son las mismas diluciones: en cada una va la OD leída en esa dilución de la serie
-          (vacío = no se leyó). Cada lectura es un punto de la curva: su UFC/mL es la de la muestra ÷ 10ᵏ.
+          (vacío = no se leyó). Cada lectura es un punto de la curva: su UFC/mL es la de la muestra ÷ {Fd}ᵏ.
           {o.blancoCorregido ? '' : ' OD neta = lectura − blanco (el de la fila o, si está vacío, el general).'}
-          {' '}<b>OD corregida</b> = las lecturas que caen en la ventana lineal ({lin[0]}–{lin[1]}), multiplicadas por su dilución (OD × 10ᵏ) y promediadas: es la OD de la muestra sin diluir
-          (en verde las lecturas usadas; en amarillo las que quedan fuera de la ventana). Como cada dilución es 1:10, la OD debería bajar 10 veces por columna: el cociente de la derecha muestra hasta qué OD el equipo es lineal y sirve para ajustar la ventana.
+          {' '}<b>OD corregida</b> = las lecturas que caen en la ventana lineal ({lin[0]}–{lin[1]}), multiplicadas por su dilución (OD × {Fd}ᵏ) y promediadas: es la OD de la muestra sin diluir
+          (en verde las lecturas usadas; en amarillo las que quedan fuera de la ventana). Como cada dilución es 1:{Fd}, la OD debería bajar {Fd} veces por columna: el cociente de la derecha muestra hasta qué OD el equipo es lineal y sirve para ajustar la ventana.
           {o.equipo === 'placa' && ' En lector de microplacas el camino óptico depende del volumen del pocillo: usá siempre el mismo volumen y no mezcles la curva con lecturas de cubeta.'}
         </p>
 
@@ -154,7 +155,8 @@ export function ODTab({ s }) {
               <td className="res">
                 {coc.length ? coc.map(([a, b], i) => {
                   const x = a.od / b.od
-                  return <span key={i} style={{ color: x < 8 || x > 12.5 ? '#8e2a1c' : undefined, fontWeight: x < 8 || x > 12.5 ? 650 : undefined }}>{i ? ' · ' : ''}<Calc d={dCociente(a, b)}>×{x.toFixed(1)}</Calc></span>
+                  const malo = x < 0.8 * Fd || x > 1.25 * Fd
+                  return <span key={i} style={{ color: malo ? '#8e2a1c' : undefined, fontWeight: malo ? 650 : undefined }}>{i ? ' · ' : ''}<Calc d={dCociente(a, b, Fd)}>×{x.toFixed(1)}</Calc></span>
                 }) : '–'}
                 {altos > 0 && <span style={{ color: '#8e2a1c' }} title="OD > 1: probablemente fuera del rango lineal"> ⚠</span>}
               </td>
@@ -172,8 +174,8 @@ export function ODTab({ s }) {
           <section className="tarjeta">
             <h2>OD por cepa y tiempo</h2>
             {linOD.nFilas > 0 && (
-              <p className={linOD.factor >= 8.5 && linOD.factor <= 11.5 ? 'nota' : 'aviso-sel'} style={{ marginTop: 0 }}>
-                Linealidad: la OD baja en promedio <b>×{linOD.factor.toFixed(1)}</b> por dilución (esperado ×10; {linOD.nFilas} {linOD.nFilas === 1 ? 'serie' : 'series'} con 2 o más lecturas &gt; 0,02).
+              <p className={lineal(linOD.factor, Fd) ? 'nota' : 'aviso-sel'} style={{ marginTop: 0 }}>
+                Linealidad: la OD baja en promedio <b>×{linOD.factor.toFixed(1)}</b> por dilución (esperado ×{Fd}; {linOD.nFilas} {linOD.nFilas === 1 ? 'serie' : 'series'} con 2 o más lecturas &gt; 0,02).
               </p>
             )}
             <div className="tabla-scroll">

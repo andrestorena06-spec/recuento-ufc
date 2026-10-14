@@ -15,6 +15,9 @@ export function MetodoTab({ s }) {
         <p className="ecuacion">UFC/mL = C × 10ᵏ / V          (V en mL: 100 µL = 0,1 mL)</p>
         <p><i>Ejemplo:</i> 182 colonias en la placa −6 con 100 µL → 182 × 10⁶ / 0,1 = 1,82 × 10⁹ UFC/mL.</p>
 
+        <p><b>Otros factores de dilución.</b> Si las diluciones seriadas son 1:5, 1:4, 1:3 o 1:2 (se elige en Archivo › Diseño del experimento), la columna −k es la dilución F⁻ᵏ y todas las fórmulas usan F en lugar de 10:
+          <code>UFC/mL = C × Fᵏ / V</code>, OD corregida = OD × Fᵏ, y entre columnas sucesivas el recuento y la OD deben bajar F veces. Las concentraciones se siguen expresando en base 10.</p>
+
         <h3>2. Rango contable</h3>
         <p>Solo se usan las placas con un número de colonias dentro del rango contable, porque fuera de él el recuento es poco confiable:</p>
         <ul>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { etiquetaK, motivoSinPunto, predicciones, resumenPorTiempo } from '../calibracion.js'
-import { cient, ESTADOS } from '../ufc.js'
+import { cient, ESTADOS, factorDe } from '../ufc.js'
 import { finito } from '../estadistica.js'
 import { excelDe, hojaCondiciones } from '../excel.js'
 import { descargarBlob } from '../utils.js'
@@ -27,9 +27,9 @@ export function PuntosSel({ s }) {
   return (
     <div className="seg">
       <BotonTip className={s.opts.puntos !== 'dilucion' ? 'on' : ''} onClick={() => s.setOpt('puntos', 'corregida')}
-        ayuda="Un punto por réplica: OD corregida (lecturas dentro de la ventana lineal × 10ᵏ) frente a la UFC/mL de la muestra. Es lo que se reporta.">OD corregida</BotonTip>
+        ayuda="Un punto por réplica: OD corregida (lecturas dentro de la ventana lineal × Fᵏ, con F el factor de dilución) frente a la UFC/mL de la muestra. Es lo que se reporta.">OD corregida</BotonTip>
       <BotonTip className={s.opts.puntos === 'dilucion' ? 'on' : ''} onClick={() => s.setOpt('puntos', 'dilucion')}
-        ayuda="Cada lectura de OD es un punto, frente a la UFC/mL de esa dilución (muestra ÷ 10ᵏ). Sirve para ver dónde se pierde la linealidad.">Por dilución</BotonTip>
+        ayuda="Cada lectura de OD es un punto, frente a la UFC/mL de esa dilución (muestra ÷ Fᵏ). Sirve para ver dónde se pierde la linealidad.">Por dilución</BotonTip>
     </div>
   )
 }
@@ -116,8 +116,8 @@ export function TablaTab({ s }) {
         </div>
         <p className="ayuda" style={{ marginTop: 0 }}>
           {corregida
-            ? <>Cada réplica es un punto: su <b>OD corregida</b> (las lecturas que caen en la ventana lineal {o.odLinMin}–{o.odLinMax}, multiplicadas por su dilución 10ᵏ y promediadas) frente a la UFC/mL de la muestra. </>
-            : <>Cada lectura de OD se compara con la UFC/mL <b>de esa misma dilución</b>: UFC/mL de la muestra ÷ 10ᵏ. </>}
+            ? <>Cada réplica es un punto: su <b>OD corregida</b> (las lecturas que caen en la ventana lineal {o.odLinMin}–{o.odLinMax}, multiplicadas por su dilución ({factorDe(o)}ᵏ) y promediadas) frente a la UFC/mL de la muestra. </>
+            : <>Cada lectura de OD se compara con la UFC/mL <b>de esa misma dilución</b>: UFC/mL de la muestra ÷ {factorDe(o)}ᵏ. </>}
           {o.modo === 'promedio'
             ? 'En modo promedio, para cada muestra y tiempo, la OD es la media aritmética y la UFC/mL la media geométrica de las réplicas válidas.'
             : 'En modo individual cada réplica es un punto; las muestras con OD de cultivo paralelo entran con sus promedios.'}
@@ -188,7 +188,7 @@ function ResumenTiempo({ s, filas, onda, u }) {
           </tbody>
         </table>
       </div>
-      <p className="nota">OD corregida = lecturas dentro de la ventana lineal × 10ᵏ, promediadas (⚠: ninguna lectura cayó dentro de la ventana). Media ± DE entre réplicas. «Estimada por curva»: tiempos sin recuento válido, calculados con la ecuación de la pestaña Curva (⚠: fuera del rango calibrado).</p>
+      <p className="nota">OD corregida = lecturas dentro de la ventana lineal × {factorDe(s.opts)}ᵏ, promediadas (⚠: ninguna lectura cayó dentro de la ventana). Media ± DE entre réplicas. «Estimada por curva»: tiempos sin recuento válido, calculados con la ecuación de la pestaña Curva (⚠: fuera del rango calibrado).</p>
     </section>
   )
 }

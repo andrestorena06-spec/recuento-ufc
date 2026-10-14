@@ -6,7 +6,7 @@ import { Ayuda, Calc } from './tip.jsx'
 import { dCV, dDE, dIC, dICMedia, dMediaGeo, dUFC } from '../desarrollos.js'
 import { importarArchivo } from './importar.js'
 import { claveGrupo, ejeUFC, etiquetaGrupo, filaEnUso, filaVacia, OPCIONES_EJE_UFC, tNorm, tNum, UNIDADES_T } from '../modelo.js'
-import { calcularFila, cient, ESTADOS, INCONTABLE, leerConteo, METODOS_UFC, RANGOS, rangoDe, sup, textoResultado, esValor, nombreRep } from '../ufc.js'
+import { calcularFila, cient, ESTADOS, factorDe, INCONTABLE, leerConteo, METODOS_UFC, potDil, proporcion, RANGOS, rangoDe, sup, textoResultado, esValor, nombreRep } from '../ufc.js'
 import { resumen, finito } from '../estadistica.js'
 import { excelDe, hojaCondiciones, plantilla } from '../excel.js'
 import { descargarBlob, paletaMuestras } from '../utils.js'
@@ -45,6 +45,7 @@ export function DatosTab({ s }) {
   const archivoRef = useRef()
   const [L, U] = rangoDe(o)
   const u = o.unidadTiempo || 'h'
+  const Fd = factorDe(o)
   const resultados = useMemo(() => Object.fromEntries(filas.map((f) => [f.id, calcularFila(f, o)])), [filas, o])
   const resumenG = useMemo(() => resumenGrupos(filas, o), [filas, o])
   const muestras = [...new Set(resumenG.map((r) => r.muestra))]
@@ -65,7 +66,7 @@ export function DatosTab({ s }) {
     }]),
     // columnas de dilución (una más de reserva para que pegar un bloque más ancho agregue columnas)
     ...Array.from({ length: K + 4 }, (_, k) => ({
-      id: 'c' + k, titulo: etiquetaDil(k), sub: k ? '10' + sup(-k) : '', oculta: k >= K, ayuda: k ? `Dilución 10⁻${k}` : 'Suspensión sin diluir',
+      id: 'c' + k, titulo: etiquetaDil(k), sub: k ? (Fd === 10 ? '10' + sup(-k) : proporcion(k, Fd)) : '', oculta: k >= K, ayuda: k ? `Dilución ${potDil(k, Fd)} (${proporcion(k, Fd)})` : 'Suspensión sin diluir',
       get: (f) => f.conteos[k] ?? '', set: setConteo(k),
       clase: (f) => {
         const v = f.conteos[k] ?? ''
@@ -313,7 +314,7 @@ function SerieDiluciones({ s, f, r }) {
     color: r.dils.includes(p.k) ? '#2f9e44' : '#d9731f', r: 5,
     titulo: p.c === INCONTABLE ? `${etiquetaDil(p.k)}: incontable` : `${etiquetaDil(p.k)}: ${p.c} colonias`,
   }))
-  const esperada = r.N > 0 && finito(r.N) ? Array.from({ length: 41 }, (_, i) => { const k = -0.5 + (K * i) / 40; return [k, r.N * r.V * 10 ** -k] }) : []
+  const esperada = r.N > 0 && finito(r.N) ? Array.from({ length: 41 }, (_, i) => { const k = -0.5 + (K * i) / 40; return [k, r.N * r.V * (r.Fd || 10) ** -k] }) : []
   const ceros = r.placas.filter((p) => p.c === 0).map((p) => etiquetaDil(p.k))
   const [abierto, setAbierto] = useState(false)
   const nombre = `${etiquetaGrupo(f.muestra, f.tiempo, s.opts.unidadTiempo)}, réplica ${f.rep}`
@@ -324,11 +325,11 @@ function SerieDiluciones({ s, f, r }) {
         <button className="chico" onClick={() => setAbierto(!abierto)}>{abierto ? 'Ocultar gráfico' : 'Ver gráfico'}</button>
       </div>
       <p className="ayuda" style={{ marginTop: 0 }}>
-        Muestra las colonias contadas en cada dilución de esta réplica. <b>Franja verde</b>: rango contable ({L}–{U} colonias). <b>Línea punteada</b>: lo esperado con el UFC/mL calculado si cada dilución baja exactamente ×10.
+        Muestra las colonias contadas en cada dilución de esta réplica. <b>Franja verde</b>: rango contable ({L}–{U} colonias). <b>Línea punteada</b>: lo esperado con el UFC/mL calculado si cada dilución baja exactamente ×{factorDe(s.opts)}.
         Puntos llenos: placas usadas; huecos: no usadas o incontables. Si los puntos se apartan de la línea hubo un error de dilución, pipeteo o colonias superpuestas.
       </p>
       {abierto && <>
-      <p className="ayuda" style={{ marginTop: 0 }}>Al diluir 1:10, el recuento debería bajar 10 veces por columna: los puntos deben caer sobre la recta esperada (pendiente −1 en escala log). Un punto que se aparta indica un error de dilución, de pipeteo o colonias superpuestas. Las diluciones no sembradas (celdas vacías) no aparecen.</p>
+      <p className="ayuda" style={{ marginTop: 0 }}>Al diluir 1:{factorDe(s.opts)}, el recuento debería bajar {factorDe(s.opts)} veces por columna: los puntos deben caer sobre la recta esperada (pendiente −1 en escala log). Un punto que se aparta indica un error de dilución, de pipeteo o colonias superpuestas. Las diluciones no sembradas (celdas vacías) no aparecen.</p>
       <PanelGrafico estilo={s.estilos.serie} setEstilo={s.setEstilo('serie')} nombre={`serie_${f.muestra}_${tNorm(f.tiempo)}_${f.rep}`} alto={300}
         puntos={puntos} rangoY={[0.8, U * 2.2, ...puntos.map((p) => p.y)]}
         bandas={[{ sup: [[-0.5, U], [K - 0.5, U]], inf: [[-0.5, L], [K - 0.5, L]], color: '#2f9e44', opacidad: 0.08 }]}
