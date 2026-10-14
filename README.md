@@ -5,6 +5,8 @@ Todo se calcula en el navegador: no hace falta instalar nada y los datos no se e
 
 **Uso:** doble clic en [`Recuento_UFC.html`](Recuento_UFC.html) (Edge, Chrome o Firefox).
 
+**Ícono:** está en [`icono/`](icono) (`.ico`, `.png` y `.svg`). Para tener un acceso directo con ícono en el escritorio de Windows, hacé doble clic una vez en `crear_acceso_directo.bat` (tiene que estar en la misma carpeta que `Recuento_UFC.html` y la carpeta `icono`).
+
 ## Pestañas
 | Pestaña | Qué hace |
 |---|---|
