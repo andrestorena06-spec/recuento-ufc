@@ -32,18 +32,10 @@ export function ArchivoTab({ s }) {
       </section>
       <div className="rejilla-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <section className="tarjeta">
-          <h2>Sesión</h2>
-          <p className="ayuda" style={{ marginTop: 0 }}>Guarda recuentos, OD, opciones, exclusiones y estilos en un archivo .json.</p>
-          <div className="fila-ctrl">
-            <button className="primario" onClick={guardar} disabled={!s.filas.length}>Guardar sesión</button>
-            <button onClick={() => ref.current.click()}>Cargar sesión</button>
-            <input ref={ref} type="file" hidden accept=".json" onChange={(e) => { e.target.files[0] && cargar(e.target.files[0]); e.target.value = '' }} />
-          </div>
-          <hr />
-          <button className="peligro" onClick={() => window.confirm('¿Empezar un trabajo nuevo? Se borran los datos actuales de este navegador.') && s.nuevo()}>Empezar de cero</button>
-        </section>
-        <section className="tarjeta">
-          <h2>Diseño del experimento</h2>
+          <h2>Condiciones del experimento</h2>
+          <p className="ayuda" style={{ marginTop: 0 }}>Una curva de calibración solo vale para estas condiciones. Se agregan como hoja «Condiciones» en todos los Excel descargados.</p>
+          <p style={{ margin: '4px 0 6px' }}><b>{cepas.length === 1 ? 'Cepa' : 'Cepas'}:</b> {cepas.length ? cepas.join(', ') : <span className="ayuda">se toman de la columna Muestra en la pestaña C</span>}
+            {cepas.length > 1 && <span className="ayuda"> · cada una tiene su propia curva de calibración y sus parámetros de crecimiento</span>}</p>
           <Campo label={<Et texto="Diluciones seriadas" ayuda="Factor de cada paso de la serie de diluciones. Con 1:10 la columna −3 es 10⁻³ (1:1000); con 1:2 la columna −3 es 2⁻³ (1:8). Se aplica a los recuentos (pestaña C) y a las lecturas de OD. Las concentraciones se siguen mostrando en base 10 (UFC/mL × 10ⁿ)." />}>
             <div className="seg">
               {FACTORES.map(([v, t]) => (
@@ -56,12 +48,6 @@ export function ArchivoTab({ s }) {
             ({[1, 2, 3, 4].map((k) => proporcion(k, factorDe(s.opts))).join(', ')}…).
             {' '}UFC/mL = colonias × {factorDe(s.opts)}ᵏ / volumen; los resultados se muestran en base 10.
           </p>
-        </section>
-        <section className="tarjeta">
-          <h2>Condiciones del experimento</h2>
-          <p className="ayuda" style={{ marginTop: 0 }}>Una curva de calibración solo vale para estas condiciones. Se agregan como hoja «Condiciones» en todos los Excel descargados.</p>
-          <p style={{ margin: '4px 0 6px' }}><b>{cepas.length === 1 ? 'Cepa' : 'Cepas'}:</b> {cepas.length ? cepas.join(', ') : <span className="ayuda">se toman de la columna Muestra en la pestaña C</span>}
-            {cepas.length > 1 && <span className="ayuda"> · cada una tiene su propia curva de calibración y sus parámetros de crecimiento</span>}</p>
           <div className="rejilla-condiciones">
             {[['medio', 'Medio de cultivo', 'BHI'], ['temperatura', 'Temperatura (°C)', '37'], ['fecha', 'Fecha', '']].map(([k, t, ph]) => (
               <Campo key={k} label={t}>
@@ -80,6 +66,17 @@ export function ArchivoTab({ s }) {
           <Campo label="Notas"><input value={c.notas || ''} placeholder="Agitación, inóculo, fase…" onChange={(e) => s.setOpt('condiciones', { ...c, notas: e.target.value })} /></Campo>
           <Check label="Mostrar las condiciones al pie de los gráficos" checked={s.opts.notaCondiciones} onChange={(v) => s.setOpt('notaCondiciones', v)}
             ayuda={textoCondiciones(s.opts, s.filas) || 'Completá algún dato para verlo'} />
+        </section>
+        <section className="tarjeta">
+          <h2>Sesión</h2>
+          <p className="ayuda" style={{ marginTop: 0 }}>Guarda recuentos, OD, opciones, exclusiones y estilos en un archivo .json.</p>
+          <div className="fila-ctrl">
+            <button className="primario" onClick={guardar} disabled={!s.filas.length}>Guardar sesión</button>
+            <button onClick={() => ref.current.click()}>Cargar sesión</button>
+            <input ref={ref} type="file" hidden accept=".json" onChange={(e) => { e.target.files[0] && cargar(e.target.files[0]); e.target.value = '' }} />
+          </div>
+          <hr />
+          <button className="peligro" onClick={() => window.confirm('¿Empezar un trabajo nuevo? Se borran los datos actuales de este navegador.') && s.nuevo()}>Empezar de cero</button>
         </section>
         <section className="tarjeta">
           <h2>Nombres de muestra guardados</h2>

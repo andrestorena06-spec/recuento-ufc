@@ -22,14 +22,17 @@ const PESTANAS = [
   ['metodo', 'Método', 'Cálculos y referencias'],
 ]
 
-// Logo: placa de Petri con colonias
+// Logo: el ícono del programa (placa de Petri con colonias y curva de crecimiento)
 const Logo = () => (
-  <svg viewBox="0 0 40 40" width="34" height="34" aria-hidden>
-    <circle cx="20" cy="20" r="17" fill="none" stroke="#ffe3c2" strokeWidth="2" />
-    <circle cx="20" cy="20" r="14" fill="none" stroke="#ffe3c2" strokeOpacity=".4" strokeWidth="1" />
-    {[[13, 14, 2.2], [24, 12, 1.6], [27, 22, 2.4], [15, 25, 1.8], [21, 19, 1.4], [19, 29, 1.5], [10, 20, 1.2], [29, 15, 1.1]].map(([x, y, r], i) => (
-      <circle key={i} cx={x} cy={y} r={r} fill="#ffe3c2" />
-    ))}
+  <svg viewBox="40 40 176 176" width="38" height="38" aria-hidden>
+    <circle cx="128" cy="128" r="84" fill="#fbe8cc" stroke="#fff3df" strokeWidth="6" />
+    <circle cx="128" cy="128" r="72" fill="none" stroke="#e9c79a" strokeWidth="2" />
+    <g fill="#d9731f">
+      {[[92, 96, 9], [118, 82, 6], [160, 92, 10], [82, 132, 6], [174, 128, 7], [100, 166, 8], [138, 112, 5], [150, 172, 6], [120, 140, 4.5]].map(([x, y, r], i) => <circle key={i} cx={x} cy={y} r={r} />)}
+    </g>
+    <path d="M60 196 C 98 196, 112 190, 132 160 S 168 86, 206 78" fill="none" stroke="#2f6f9e" strokeWidth="11" strokeLinecap="round" />
+    <path d="M60 196 C 98 196, 112 190, 132 160 S 168 86, 206 78" fill="none" stroke="#e8f4ff" strokeWidth="4" strokeLinecap="round" />
+    <circle cx="206" cy="78" r="12" fill="#2f6f9e" stroke="#e8f4ff" strokeWidth="4" />
   </svg>
 )
 
