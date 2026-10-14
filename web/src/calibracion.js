@@ -3,7 +3,7 @@
 // x = OD neta de la suspensión leída, y = UFC/mL de ESA suspensión.
 // ============================================================
 import { finito, media, desvio, mco, varAjuste, tCuantil, shapiroWilk, resumen, fCdf } from './estadistica.js'
-import { calcularFila, esValor, leerFactor } from './ufc.js'
+import { calcularFila, esValor, factorDe, leerFactor } from './ufc.js'
 import { claveGrupo, etiquetaGrupo, filaEnUso, tNorm, tNum } from './modelo.js'
 
 // OD de una fila: una lectura por dilución (od.lecturas[k] = OD de la dilución 10⁻ᵏ de la misma serie).
@@ -22,7 +22,10 @@ export function odDeFila(fila, o) {
   return { porDil, n: porDil.length, blanco: bl }
 }
 
-// Control de linealidad del fotómetro: en una serie 1:10 la OD debe bajar 10 veces por dilución.
+// ¿El cociente medio entre diluciones sucesivas es el esperado (F)? Tolerancia de ±15 %
+export const lineal = (f, F) => f >= 0.85 * F && f <= 1.15 * F
+
+// Control de linealidad del fotómetro: en una serie 1:F la OD debe bajar F veces por dilución.
 // Pendiente común de log₁₀(OD) frente a k dentro de cada fila (esperada −1); usa OD > odMin.
 export function linealidadOD(filas, o, odMin = 0.02) {
   let sxy = 0, sxx = 0, nFilas = 0, nPuntos = 0
@@ -60,7 +63,8 @@ export function odCorregida(fila, o) {
       fuera = true
     }
   }
-  const vals = usadas.map((x) => x.od * 10 ** x.k)
+  const F = factorDe(o)
+  const vals = usadas.map((x) => x.od * F ** x.k)
   return { od: vals.length ? media(vals) : NaN, de: vals.length > 1 ? desvio(vals) : NaN, dils: usadas.map((x) => x.k), lecturas: d.porDil, fuera, n: d.porDil.length }
 }
 
@@ -90,9 +94,9 @@ export function correspondencia(filasTodas, o) {
       return
     }
     d.porDil.forEach(({ k, od, crudo }) => {
-      const y = r.Nmadre / 10 ** k
+      const y = r.Nmadre / factorDe(o) ** k
       ind.push({
-        ...base, id: f.id + ':' + k, k, x: od, crudo, y, ic: r.icMadre.map((v) => v / 10 ** k),
+        ...base, id: f.id + ':' + k, k, x: od, crudo, y, ic: r.icMadre.map((v) => v / factorDe(o) ** k),
         valido: esValor(r, o.incluirEstimados) && finito(od) && finito(y),
       })
     })
@@ -264,14 +268,14 @@ export function interpretar(ajustes, actual, puntos, lin, o = {}) {
   const fuera = puntos.filter((p) => p.fueraVentana).length
   if (fuera) out.push(['aviso', `${fuera} ${fuera === 1 ? 'punto usa' : 'puntos usan'} una OD corregida sin ninguna lectura dentro de la ventana lineal (${(o.odLinMin ?? 0.1)}–${(o.odLinMax ?? 0.8)}): se tomó la lectura más cercana. Conviene leer otra dilución.`])
   if (lin && lin.nFilas > 0 && finito(lin.pendiente)) {
-    const f = lin.factor
-    out.push(f >= 8.5 && f <= 11.5
-      ? ['ok', `Linealidad del fotómetro: entre diluciones sucesivas la OD baja ×${f.toFixed(1)} en promedio (esperado ×10; ${lin.nFilas} series). La respuesta es lineal en el rango leído.`]
-      : ['aviso', `Linealidad del fotómetro: entre diluciones sucesivas la OD baja ×${f.toFixed(1)} en promedio (esperado ×10; ${lin.nFilas} series). ${f < 8.5 ? 'Baja menos de lo esperado: las lecturas más concentradas están saturadas (fuera del rango lineal) o las más diluidas están cerca del límite de detección.' : 'Baja más de lo esperado: revisá el blanco y las diluciones.'} Conviene limitar la curva al rango de OD en que el cociente es ≈ 10.`])
+    const f = lin.factor, F = factorDe(o)
+    out.push(lineal(f, F)
+      ? ['ok', `Linealidad del fotómetro: entre diluciones sucesivas la OD baja ×${f.toFixed(1)} en promedio (esperado ×${F}; ${lin.nFilas} series). La respuesta es lineal en el rango leído.`]
+      : ['aviso', `Linealidad del fotómetro: entre diluciones sucesivas la OD baja ×${f.toFixed(1)} en promedio (esperado ×${F}; ${lin.nFilas} series). ${f < F ? 'Baja menos de lo esperado: las lecturas más concentradas están saturadas (fuera del rango lineal) o las más diluidas están cerca del límite de detección.' : 'Baja más de lo esperado: revisá el blanco y las diluciones.'} Conviene limitar la curva al rango de OD en que el cociente es ≈ ${F}.`])
   }
   const reps = new Set(puntos.filter((p) => p.tipo === 'individual').map((p) => p.filaId))
   if (puntos.filter((p) => p.tipo === 'individual').length > reps.size) {
-    out.push(['aviso', 'Varias diluciones de una misma réplica comparten el mismo recuento (sus UFC/mL son el recuento ÷ 10ᵏ), así que sus errores no son independientes. La curva es correcta, pero los intervalos de confianza resultan algo más estrechos de lo real: para una incertidumbre conservadora mirá la banda de predicción o usá el modo promedio.'])
+    out.push(['aviso', 'Varias diluciones de una misma réplica comparten el mismo recuento (sus UFC/mL son el recuento ÷ Fᵏ), así que sus errores no son independientes. La curva es correcta, pero los intervalos de confianza resultan algo más estrechos de lo real: para una incertidumbre conservadora mirá la banda de predicción o usá el modo promedio.'])
   }
   const L = ajustes.lineal, Q = ajustes.cuadratico, P = ajustes.loglog
   if (L?.f) {
@@ -411,7 +415,8 @@ export function predecirFila(curva, fila, o) {
   const res = lista.map(({ x, k }) => ({ b: aj.banda(x), k, x })).filter((r) => r.b && r.b.y > 0)
   if (!res.length) return null
   const lg = (v) => Math.log10(Math.max(v, 1e-300))
-  const m = (f) => 10 ** media(res.map((r) => lg(f(r)) + r.k))
+  const lF = Math.log10(factorDe(o))
+  const m = (f) => 10 ** media(res.map((r) => lg(f(r)) + r.k * lF))
   const extrapola = res.some((r) => r.x < xmin || r.x > xmax)
   return { y: m((r) => r.b.y), p: [m((r) => Math.max(r.b.p[0], 1e-300)), m((r) => r.b.p[1])], x: res[0].x, extrapola }
 }

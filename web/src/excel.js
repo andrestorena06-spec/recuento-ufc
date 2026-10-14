@@ -193,7 +193,7 @@ export function hojaCondiciones(o, filasDatos = []) {
   const filas = [
     [cepas.length === 1 ? 'Cepa' : 'Cepas', cepas.join(', ')], ['Medio de cultivo', c.medio], ['Temperatura (°C)', c.temperatura], ['Fecha', c.fecha],
     ['Longitud de onda (nm)', onda], ['Equipo de OD', equipo], ['Lecturas corregidas por el blanco', o.blancoCorregido ? 'Sí' : 'No'], ['Origen de la OD', o.origenGlobal === 'paralelo' ? 'Cultivo paralelo' : 'Misma suspensión que se sembró'],
-    ['Ventana lineal de OD', `${o.odLinMin} – ${o.odLinMax}`], ['Volumen sembrado (µL)', o.volFijo ? o.volDef : 'por fila'],
+    ['Diluciones seriadas', `1:${[2, 3, 4, 5, 10].includes(Number(o.factorDil)) ? o.factorDil : 10}`], ['Ventana lineal de OD', `${o.odLinMin} – ${o.odLinMax}`], ['Volumen sembrado (µL)', o.volFijo ? o.volDef : 'por fila'],
     ['Rango contable', o.rango === 'custom' ? `${o.min}–${o.max}` : o.rango], ['Notas', c.notas],
   ].map(([k, v]) => ({ Dato: k, Valor: v === undefined || v === null ? '' : String(v) }))
   return { nombre: 'Condiciones', columnas: ['Dato', 'Valor'], filas }

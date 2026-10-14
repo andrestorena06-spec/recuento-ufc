@@ -95,4 +95,11 @@ const cA = [[0.1, 7.1], [0.2, 7.45], [0.3, 7.6], [0.45, 7.9], [0.6, 8.05], [0.8,
 const cB = [[0.1, 7.3], [0.25, 7.8], [0.35, 8.0], [0.5, 8.3], [0.7, 8.6], [0.9, 8.85]].map(([x, z]) => ({ x, y: 10 ** z, muestra: 'B' }))
 const fc = compararCepas(ajustar([...cA, ...cB], 'semilog'), [{ muestra: 'A', aj: ajustar(cA, 'semilog') }, { muestra: 'B', aj: ajustar(cB, 'semilog') }])
 cerca(fc.F, 12.557883, 1e-6); cerca(fc.p, 3.405812e-3, 1e-5)
+// diluciones seriadas 1:2: la columna k es 2⁻ᵏ
+const o2 = { ...o, factorDil: 2 }
+cerca(calcularFila({ conteos: ['', '', '', 200] }, o2).N, 200 * 2 ** 3 / 0.1)
+cerca(calcularFila({ conteos: ['', '', '', 200, 100] }, o2).N, 300 / (0.1 * (1 / 8 + 1 / 16)))
+const f2 = { id: 'c', muestra: 'C', tiempo: '0', rep: 1, conteos: ['', '', '', 100], od: { lecturas: ['1.6', '0.8', '0.4', '0.2'], blanco: '' } }
+cerca(odCorregida(f2, { ...o2, blancoCorregido: true, odLinMin: 0.1, odLinMax: 0.8 }).od, 1.6)
+cerca(linealidadOD([f2], { ...o2, blancoCorregido: true }).factor, 2, 1e-9)
 console.log('Todas las pruebas pasaron.')

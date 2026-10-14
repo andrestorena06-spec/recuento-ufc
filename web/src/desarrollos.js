@@ -3,48 +3,51 @@
 // Cada función devuelve { titulo, pasos: [[izquierda, derecha]], nota }.
 // Un paso con derecha undefined es un renglón de texto.
 // ============================================================
-import { cient, sup } from './ufc.js'
+import { cient, factorDe, sup } from './ufc.js'
 import { finito, icPoisson, media, desvio, tCuantil } from './estadistica.js'
 
 const n3 = (x, d = 3) => (finito(x) ? Number(x.toFixed(d)).toString() : '–')
-const pot = (k) => (k === 0 ? '10⁰' : `10${sup(-k)}`)
+const pot = (k, F = 10) => (k === 0 ? 'sin diluir' : `${F}${sup(-k)}`)
+const mul = (k, F = 10) => `${F}${sup(k)}`
 const V = (v) => `${n3(v, 4)} mL`
 
 export function dUFC(r) {
   if (!r || r.estado === 'vacio') return null
+  const F = r.Fd || 10
   if (r.estado === 'bajoLD') {
     const p = r.usadas[0]
     return {
       titulo: 'UFC/mL: menor que el límite de detección',
-      pasos: [['Ninguna placa tiene colonias.'], ['Límite', `1 colonia / (V × 10⁻ᵏ) de la placa menos diluida`],
-        ['', `= 1 / (${V(r.V)} × ${pot(p.k)})`], ['', `= ${cient(r.N)} UFC/mL`], ['Resultado', `< ${cient(r.N)} UFC/mL`]],
+      pasos: [['Ninguna placa tiene colonias.'], ['Límite', `1 colonia / (V × ${F}⁻ᵏ) de la placa menos diluida`],
+        ['', `= 1 / (${V(r.V)} × ${pot(p.k, F)})`], ['', `= ${cient(r.N)} UFC/mL`], ['Resultado', `< ${cient(r.N)} UFC/mL`]],
     }
   }
   if (r.estado === 'sobreLC') {
     const p = r.usadas[0]
     return {
       titulo: 'UFC/mL: mayor que el límite superior',
-      pasos: [['Todas las placas son incontables.'], ['Límite', `máximo contable / (V × 10⁻ᵏ) de la placa más diluida`],
-        ['', `= ${n3(r.N * r.V * 10 ** -p.k, 0)} / (${V(r.V)} × ${pot(p.k)})`], ['Resultado', `> ${cient(r.N)} UFC/mL`]],
+      pasos: [['Todas las placas son incontables.'], ['Límite', `máximo contable / (V × ${F}⁻ᵏ) de la placa más diluida`],
+        ['', `= ${n3(r.N * r.V * F ** -p.k, 0)} / (${V(r.V)} × ${pot(p.k, F)})`], ['Resultado', `> ${cient(r.N)} UFC/mL`]],
     }
   }
   const us = r.usadas
-  const pasos = [['Placas usadas', us.map((p) => `${pot(p.k)}: ${p.c} col.`).join(' · ')]]
+  const pasos = [['Placas usadas', us.map((p) => `${pot(p.k, F)}: ${p.c} col.`).join(' · ')]]
+  if (F !== 10) pasos.push(['Diluciones', `seriadas 1:${F} (la columna −k es ${F}⁻ᵏ)`])
   if (us.length === 1) {
     const p = us[0]
-    pasos.push(['UFC/mL', 'C × 10ᵏ / V'], ['', `= ${p.c} × 10${sup(p.k)} / ${V(r.V)}`], ['', `= ${cient(r.N)} UFC/mL`])
+    pasos.push(['UFC/mL', `C × ${F}ᵏ / V`], ['', `= ${p.c} × ${mul(p.k, F)} / ${V(r.V)}`], ['', `= ${cient(r.N)} UFC/mL`])
   } else if (r.N !== r.sumaC / r.sumaQ) {
     // media aritmética de las estimaciones de cada placa
-    pasos.push(['UFC/mL', 'media( Cᵢ × 10ᵏ / V )'])
-    us.forEach((p) => pasos.push([pot(p.k), `${p.c} × 10${sup(p.k)} / ${V(r.V)} = ${cient(p.c / p.q)}`]))
+    pasos.push(['UFC/mL', `media( Cᵢ × ${F}ᵏ / V )`])
+    us.forEach((p) => pasos.push([pot(p.k, F), `${p.c} × ${mul(p.k, F)} / ${V(r.V)} = ${cient(p.c / p.q)}`]))
     pasos.push(['Media', `= ${cient(r.N)} UFC/mL`])
   } else {
-    pasos.push(['UFC/mL', 'ΣC / Σ(V × 10⁻ᵏ)'],
-      ['', `= (${us.map((p) => p.c).join(' + ')}) / (${us.map((p) => `${n3(r.V, 4)} × ${pot(p.k)}`).join(' + ')})`],
+    pasos.push(['UFC/mL', `ΣC / Σ(V × ${F}⁻ᵏ)`],
+      ['', `= (${us.map((p) => p.c).join(' + ')}) / (${us.map((p) => `${n3(r.V, 4)} × ${pot(p.k, F)}`).join(' + ')})`],
       ['', `= ${r.sumaC} / ${cient(r.sumaQ, 3)} mL`], ['', `= ${cient(r.N)} UFC/mL`])
   }
   if (r.estado === 'estBajo' || r.estado === 'estAlto') pasos.push([`Estimado: ninguna placa en el rango contable (${r.estado === 'estBajo' ? 'por debajo' : 'por encima'}).`])
-  if (finito(r.pChi)) pasos.push(['Coherencia χ²', `p ${r.pChi < 0.001 ? '< 0.001' : '= ' + r.pChi.toPrecision(2)} (p < 0,05: las diluciones no bajan ×10)`])
+  if (finito(r.pChi)) pasos.push(['Coherencia χ²', `p ${r.pChi < 0.001 ? '< 0.001' : '= ' + r.pChi.toPrecision(2)} (p < 0,05: las diluciones no bajan ×${F})`])
   return { titulo: 'Cálculo de UFC/mL', pasos }
 }
 
@@ -56,7 +59,7 @@ export function dIC(r) {
     pasos: [['ΣC (colonias usadas)', `${r.sumaC}`],
       ['λ inferior', `χ²(0,025; ${2 * r.sumaC}) / 2 = ${n3(lo, 2)}`],
       ['λ superior', `χ²(0,975; ${2 * r.sumaC + 2}) / 2 = ${n3(hi, 2)}`],
-      ['Σ(V × 10⁻ᵏ)', `${cient(r.sumaQ, 3)} mL`],
+      [`Σ(V × ${r.Fd || 10}⁻ᵏ)`, `${cient(r.sumaQ, 3)} mL`],
       ['IC 95 %', `[${n3(lo, 2)} ; ${n3(hi, 2)}] / ${cient(r.sumaQ, 3)}`],
       ['', `= ${cient(r.ic[0])} a ${cient(r.ic[1])} UFC/mL`]],
     nota: 'Refleja solo el error de conteo (Poisson); el de pipeteo se ve en la variación entre réplicas.',
@@ -66,17 +69,18 @@ export function dIC(r) {
 export function dODCorr(oc, o, ventana) {
   if (!oc || !finito(oc.od)) return null
   const usadas = oc.lecturas.filter((x) => oc.dils.includes(x.k))
+  const F = factorDe(o)
   const pasos = [['Ventana lineal', `${ventana[0]} a ${ventana[1]}`]]
   oc.lecturas.forEach((x) => pasos.push([x.k === 0 ? 'Sin diluir' : `−${x.k}`, `${o.blancoCorregido || x.crudo === x.od ? '' : `${n3(x.crudo, 4)} − ${n3(x.crudo - x.od, 4)} (blanco) = `}${n3(x.od, 4)}${oc.dils.includes(x.k) ? '  ✓ usada' : '  · fuera'}`]))
-  pasos.push(['OD corregida', 'media( OD netaₖ × 10ᵏ )'],
-    ['', `= ${usadas.length > 1 ? '(' : ''}${usadas.map((x) => `${n3(x.od, 4)} × 10${sup(x.k)}`).join(' + ')}${usadas.length > 1 ? `) / ${usadas.length}` : ''}`],
+  pasos.push(['OD corregida', `media( OD netaₖ × ${F}ᵏ )`],
+    ['', `= ${usadas.length > 1 ? '(' : ''}${usadas.map((x) => `${n3(x.od, 4)} × ${mul(x.k, F)}`).join(' + ')}${usadas.length > 1 ? `) / ${usadas.length}` : ''}`],
     ['', `= ${n3(oc.od, 4)}`])
   if (oc.fuera) pasos.push(['Ninguna lectura cayó en la ventana: se usó la más cercana.'])
   return { titulo: 'Cálculo de la OD corregida', pasos }
 }
 
-export function dCociente(a, b) {
-  return { titulo: 'Linealidad entre diluciones', pasos: [['Cociente', `OD(−${a.k}) / OD(−${b.k})`], ['', `= ${n3(a.od, 4)} / ${n3(b.od, 4)}`], ['', `= ${n3(a.od / b.od, 2)}  (esperado ≈ 10)`]] }
+export function dCociente(a, b, F = 10) {
+  return { titulo: 'Linealidad entre diluciones', pasos: [['Cociente', `OD(−${a.k}) / OD(−${b.k})`], ['', `= ${n3(a.od, 4)} / ${n3(b.od, 4)}`], ['', `= ${n3(a.od / b.od, 2)}  (esperado ≈ ${F})`]] }
 }
 
 // media geométrica a partir de los log₁₀ de las réplicas

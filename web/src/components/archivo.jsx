@@ -3,6 +3,7 @@ import { plantilla } from '../excel.js'
 import { Campo, Check, Modal, Select } from './ui.jsx'
 import { Et } from './tip.jsx'
 import { cepasDe, textoCondiciones } from '../modelo.js'
+import { factorDe, FACTORES, proporcion, sup } from '../ufc.js'
 import { descargarBlob } from '../utils.js'
 
 export function ArchivoTab({ s }) {
@@ -18,7 +19,7 @@ export function ArchivoTab({ s }) {
     <div className="pagina">
       <section className="tarjeta">
         <h2>Recuento UFC</h2>
-        <p>Calcula UFC/mL a partir de recuentos manuales en diluciones seriadas 1:10 y construye la correspondencia entre UFC/mL y densidad óptica (curva de calibración).</p>
+        <p>Calcula UFC/mL a partir de recuentos manuales en diluciones seriadas (1:10, 1:5, 1:4, 1:3 o 1:2) y construye la correspondencia entre UFC/mL y densidad óptica (curva de calibración).</p>
         <p className="ayuda aviso-privacidad">Todo se calcula en tu navegador: los datos no se envían a ningún servidor. El trabajo se guarda solo en este navegador; para pasarlo a otra computadora usá «Guardar sesión».</p>
         <ol>
           <li><b>C</b> (colonias): una fila por réplica (muestra, tiempo y réplica) con las colonias contadas en cada dilución. Se puede cargar un Excel o pegar una tabla.</li>
@@ -40,6 +41,21 @@ export function ArchivoTab({ s }) {
           </div>
           <hr />
           <button className="peligro" onClick={() => window.confirm('¿Empezar un trabajo nuevo? Se borran los datos actuales de este navegador.') && s.nuevo()}>Empezar de cero</button>
+        </section>
+        <section className="tarjeta">
+          <h2>Diseño del experimento</h2>
+          <Campo label={<Et texto="Diluciones seriadas" ayuda="Factor de cada paso de la serie de diluciones. Con 1:10 la columna −3 es 10⁻³ (1:1000); con 1:2 la columna −3 es 2⁻³ (1:8). Se aplica a los recuentos (pestaña C) y a las lecturas de OD. Las concentraciones se siguen mostrando en base 10 (UFC/mL × 10ⁿ)." />}>
+            <div className="seg">
+              {FACTORES.map(([v, t]) => (
+                <button key={v} className={factorDe(s.opts) === v ? 'on' : ''} onClick={() => s.setOpt('factorDil', v)}>{t.replace(' (decimal)', '')}</button>
+              ))}
+            </div>
+          </Campo>
+          <p className="ayuda">
+            Cada columna −k de las pestañas C y OD es la dilución <b>{factorDe(s.opts)}{sup(-1)}</b>, <b>{factorDe(s.opts)}{sup(-2)}</b>, <b>{factorDe(s.opts)}{sup(-3)}</b>…
+            ({[1, 2, 3, 4].map((k) => proporcion(k, factorDe(s.opts))).join(', ')}…).
+            {' '}UFC/mL = colonias × {factorDe(s.opts)}ᵏ / volumen; los resultados se muestran en base 10.
+          </p>
         </section>
         <section className="tarjeta">
           <h2>Condiciones del experimento</h2>

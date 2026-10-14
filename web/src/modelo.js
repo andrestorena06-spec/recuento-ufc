@@ -5,7 +5,7 @@ export const M_DEF = 3 // columnas de OD: sin diluir, 10⁻¹, 10⁻²
 
 export const optsDef = () => ({
   // recuento
-  rango: '30-300', min: 30, max: 300, metodo: 'ponderada', volDef: 100, volFijo: true, incluirEstimados: false,
+  factorDil: 10, rango: '30-300', min: 30, max: 300, metodo: 'ponderada', volDef: 100, volFijo: true, incluirEstimados: false,
   unidadTiempo: 'h', nombres: [],
   // OD: ventana lineal del fotómetro para elegir las lecturas que forman la OD corregida
   onda: '600', ondaOtra: '', equipo: 'cubeta', blancoOD: '', blancoCorregido: false, origenGlobal: 'misma',

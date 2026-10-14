@@ -1,5 +1,6 @@
 // ============================================================
-// Cálculo de UFC/mL a partir de recuentos en diluciones seriadas 1:10.
+// Cálculo de UFC/mL a partir de recuentos en diluciones seriadas 1:F (F = 10 por defecto; 5, 4, 3 o 2).
+// Abajo se escribe 10⁻ᵏ por simplicidad: con otro factor es F⁻ᵏ.
 //
 // Columna k (0 = sin diluir, 1 = 10⁻¹, …): cada placa recibe V mL de la suspensión
 // diluida 10⁻ᵏ, es decir V·10⁻ᵏ mL de la suspensión de partida. Si la suspensión de
@@ -24,6 +25,13 @@ export const METODOS_UFC = [
   ['una', 'Una sola dilución: la más cercana al centro del rango'],
   ['media', 'Media aritmética de las estimaciones de cada dilución en rango'],
 ]
+
+// Factor de las diluciones seriadas (1:10 por defecto; también 1:5, 1:4, 1:3 y 1:2). La columna k es la dilución 1/Fᵏ.
+export const FACTORES = [[10, '1:10 (decimal)'], [5, '1:5'], [4, '1:4'], [3, '1:3'], [2, '1:2']]
+export const factorDe = (o) => ([2, 3, 4, 5, 10].includes(Number(o?.factorDil)) ? Number(o.factorDil) : 10)
+// Dilución de la columna k escrita como potencia (10⁻³, 2⁻³) y como proporción (1:1000, 1:8)
+export const potDil = (k, F = 10) => (k === 0 ? 'sin diluir' : `${F}${sup(-k)}`)
+export const proporcion = (k, F = 10) => (k === 0 ? 'sin diluir' : `1:${(F ** k).toLocaleString('es')}`)
 
 export const INCONTABLE = 'INC'
 // Interpreta lo que se escribe en una celda de recuento
@@ -64,20 +72,21 @@ export function calcularFila(fila, o) {
   const [L, U] = rangoDe(o)
   const V = ((o.volFijo ? NaN : Number(fila.vol)) || Number(o.volDef) || 100) / 1000 // mL
   const F = 1
-  const placas = (fila.conteos || []).map((c, k) => ({ k, c: leerConteo(c), q: V * 10 ** -k })).filter((p) => p.c !== null)
+  const Fd = factorDe(o)
+  const placas = (fila.conteos || []).map((c, k) => ({ k, c: leerConteo(c), q: V * Fd ** -k })).filter((p) => p.c !== null)
   const avisos = []
-  const out = { V, F, placas, avisos, estado: 'vacio', N: NaN, ic: [NaN, NaN], usadas: [], sumaC: NaN, sumaQ: NaN, pChi: NaN }
+  const out = { V, F, Fd, placas, avisos, estado: 'vacio', N: NaN, ic: [NaN, NaN], usadas: [], sumaC: NaN, sumaQ: NaN, pChi: NaN }
   if (!placas.length) return terminar(out)
 
   // serie coherente: al diluir 10 veces el recuento no puede aumentar
   const num = placas.filter((p) => p.c !== INCONTABLE)
   for (let i = 1; i < num.length; i++) {
-    if (num[i].c > num[i - 1].c && num[i - 1].c > 0) avisos.push(`El recuento aumenta de 10⁻${num[i - 1].k} a 10⁻${num[i].k}`)
+    if (num[i].c > num[i - 1].c && num[i - 1].c > 0) avisos.push(`El recuento aumenta de ${potDil(num[i - 1].k, Fd)} a ${potDil(num[i].k, Fd)}`)
   }
   placas.forEach((p, i) => {
     if (p.c !== INCONTABLE) return
     const posterior = placas.slice(0, i).find((x) => x.c !== INCONTABLE && x.c <= U)
-    if (posterior) avisos.push(`Placa incontable en 10⁻${p.k} después de una contable en 10⁻${posterior.k}`)
+    if (posterior) avisos.push(`Placa incontable en ${potDil(p.k, Fd)} después de una contable en ${potDil(posterior.k, Fd)}`)
   })
 
   const enRango = num.filter((p) => p.c >= L && p.c <= U)
@@ -142,7 +151,7 @@ export function calcularFila(fila, o) {
     out.pChi = 1 - pchisq(chi, usadas.length - 1)
     if (out.pChi < 0.05) avisos.push(`Diluciones poco coherentes entre sí (χ² p ${fmtP(out.pChi)})`)
     for (let i = 1; i < usadas.length; i++) {
-      const r = (usadas[i - 1].c / usadas[i].c) / 10 ** (usadas[i].k - usadas[i - 1].k - 1)
+      const r = (usadas[i - 1].c / usadas[i].c) / Fd ** (usadas[i].k - usadas[i - 1].k - 1)
       out.razon = r
     }
   }

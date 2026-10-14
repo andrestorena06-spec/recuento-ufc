@@ -5,13 +5,13 @@ export const GLOSARIO = {
   ufc: {
     titulo: 'UFC/mL',
     texto: 'Unidades formadoras de colonias por mL de la muestra. Se calcula con las placas que quedaron dentro del rango contable.',
-    formula: ['UFC/mL = ΣC / Σ(V × 10⁻ᵏ)', 'C = colonias de cada placa usada', 'V = volumen sembrado (mL)', 'k = dilución de esa placa (10⁻ᵏ)'],
-    nota: 'Con una sola placa: UFC/mL = C × 10ᵏ / V. Es la media ponderada de ISO 7218 / FDA BAM.',
+    formula: ['UFC/mL = ΣC / Σ(V × F⁻ᵏ)', 'C = colonias de cada placa usada', 'V = volumen sembrado (mL)', 'k = paso de dilución de esa placa', 'F = factor de dilución (10 por defecto; se elige en Archivo)'],
+    nota: 'Con una sola placa: UFC/mL = C × Fᵏ / V. Es la media ponderada de ISO 7218 / FDA BAM.',
   },
   ic95: {
     titulo: 'IC 95 % del recuento',
     texto: 'Intervalo de confianza del 95 % por el error de conteo (distribución de Poisson), método exacto de Garwood.',
-    formula: ['λ_inf = χ²(0,025; 2·ΣC) / 2', 'λ_sup = χ²(0,975; 2·ΣC + 2) / 2', 'IC = [λ_inf ; λ_sup] / Σ(V × 10⁻ᵏ)'],
+    formula: ['λ_inf = χ²(0,025; 2·ΣC) / 2', 'λ_sup = χ²(0,975; 2·ΣC + 2) / 2', 'IC = [λ_inf ; λ_sup] / Σ(V × F⁻ᵏ)'],
     nota: 'Solo incluye el error de conteo, no el de pipeteo; por eso importan las réplicas.',
   },
   estado: {
@@ -50,7 +50,7 @@ export const GLOSARIO = {
   odCorr: {
     titulo: 'OD corregida',
     texto: 'OD de la muestra sin diluir, calculada con las lecturas que caen en la ventana lineal del equipo y llevadas a la suspensión original.',
-    formula: ['OD neta = lectura − blanco', 'OD corregida = media( OD netaₖ × 10ᵏ )', 'solo lecturas con ventana_mín ≤ OD neta ≤ ventana_máx'],
+    formula: ['OD neta = lectura − blanco', 'OD corregida = media( OD netaₖ × Fᵏ )', 'solo lecturas con ventana_mín ≤ OD neta ≤ ventana_máx'],
     nota: 'Ejemplo: −2 leyó 0,24 → 0,24 × 100 = 2,4. Puede ser mayor que 1: es la OD que tendría la muestra si el equipo fuera lineal.',
   },
   odNeta: {
@@ -60,13 +60,13 @@ export const GLOSARIO = {
   },
   cociente: {
     titulo: 'OD ÷ OD siguiente',
-    texto: 'Cociente entre la OD de una dilución y la de la siguiente. Como cada dilución es 1:10, en el rango lineal vale ≈ 10. Un valor menor indica saturación del equipo (o lecturas cerca del límite de detección).',
-    formula: ['cociente = OD neta(10⁻ᵏ) / OD neta(10⁻⁽ᵏ⁺¹⁾) ≈ 10'],
+    texto: 'Cociente entre la OD de una dilución y la de la siguiente. Como cada dilución es 1:F, en el rango lineal vale ≈ F (10 con diluciones decimales). Un valor menor indica saturación del equipo (o lecturas cerca del límite de detección).',
+    formula: ['cociente = OD neta(F⁻ᵏ) / OD neta(F⁻⁽ᵏ⁺¹⁾) ≈ F'],
   },
   ufcDil: {
     titulo: 'UFC/mL de la dilución',
     texto: 'Concentración de la suspensión diluida cuya OD se leyó (modo «por dilución»).',
-    formula: ['UFC/mL de la dilución = UFC/mL de la muestra / 10ᵏ'],
+    formula: ['UFC/mL de la dilución = UFC/mL de la muestra / Fᵏ'],
   },
   ufcPorOD: {
     titulo: 'UFC/mL por unidad de OD',
